@@ -12,10 +12,27 @@ from pathlib import Path
 
 SEMGREP_RULES = {
     "python": [
-        "p/python",           # official Python ruleset
-        "p/owasp-top-ten",    # OWASP Top 10 mappings
-        "p/secrets",          # hardcoded credentials
+        "p/python",
+        "p/owasp-top-ten",
         "p/sql-injection",
+    ],
+    "javascript": [
+        "p/javascript",
+        "p/react",
+        "p/typescript",
+    ],
+    "typescript": [
+        "p/typescript",
+        "p/react",
+    ],
+    "go": [
+        "p/golang",
+    ],
+    "java": [
+        "p/java",
+    ],
+    "csharp": [
+        "p/csharp",
     ]
 }
 
@@ -31,7 +48,15 @@ def run_semgrep(code: str, language: str = "python") -> dict:
     Write code to a temp file, run Semgrep, return parsed JSON output.
     Returns {"findings": [...], "raw": {...}}
     """
-    ext = ".py" if language == "python" else f".{language}"
+    ext_map = {
+        "python": ".py",
+        "javascript": ".js",
+        "typescript": ".ts",
+        "go": ".go",
+        "java": ".java",
+        "csharp": ".cs"
+    }
+    ext = ext_map.get(language, f".{language}")
 
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=ext, delete=False, encoding="utf-8"
