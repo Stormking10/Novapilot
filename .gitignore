@@ -30,3 +30,4 @@ __pycache__/
 *.ipa
 *.apk
 *.aab
+owaspilot_backend/backend/data/

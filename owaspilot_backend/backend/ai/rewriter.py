@@ -35,6 +35,20 @@ async def rewrite_secure(code: str, vulnerabilities: list[dict]) -> dict:
     """
     Returns rewritten code + explanation of changes.
     """
+    if not ANTHROPIC_API_KEY:
+        score = max(0, 100 - len(vulnerabilities) * 20)
+        return {
+            "rewritten_code": code,
+            "changes": [
+                {
+                    "type": "Added",
+                    "description": "Configure ANTHROPIC_API_KEY to generate an AI secure rewrite.",
+                }
+            ],
+            "security_score_before": score,
+            "security_score_after": score,
+        }
+
     vuln_summary = json.dumps(
         [{"title": v.get("title"), "severity": v.get("severity"), "line": v.get("line")}
          for v in vulnerabilities],

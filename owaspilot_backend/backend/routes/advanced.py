@@ -7,7 +7,7 @@ Phase 5 endpoints:
   POST /api/rewrite          — Secure code rewriter
 """
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel
 from typing import Optional
 import json
@@ -129,3 +129,45 @@ async def rewrite(req: RewriteRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=502, detail=str(e))
+
+
+class ReportRequest(BaseModel):
+    result: dict
+
+
+@router.post("/report", response_class=PlainTextResponse)
+async def report(req: ReportRequest):
+    result = req.result
+    vulns = result.get("vulnerabilities", [])
+    lines = [
+        "# Novapilot Security Report",
+        "",
+        f"Scan ID: {result.get('scan_id') or result.get('id', 'unknown')}",
+        f"Language: {result.get('language', 'unknown')}",
+        f"Risk score: {result.get('risk_score', 0)}",
+        f"Summary: {result.get('summary', '')}",
+        "",
+        "## Findings",
+        "",
+    ]
+    if not vulns:
+        lines.append("No vulnerabilities were detected.")
+    for i, vuln in enumerate(vulns, start=1):
+        lines.extend([
+            f"### {i}. {vuln.get('title', 'Security finding')}",
+            "",
+            f"- Severity: {vuln.get('severity', 'INFO')}",
+            f"- Line: {vuln.get('line', '?')}",
+            f"- OWASP: {vuln.get('owasp') or 'Unmapped'}",
+            f"- CWE: {vuln.get('cwe') or 'Unmapped'}",
+            "",
+            vuln.get("explanation", ""),
+            "",
+            "Recommended fix:",
+            "",
+            "```",
+            vuln.get("fix", ""),
+            "```",
+            "",
+        ])
+    return "\n".join(lines)

@@ -14,10 +14,13 @@ export interface Vulnerability {
 
 export interface ScanResult {
   scan_id: string;
+  id?: string;
   language: string;
   risk_score: number;
   summary: string;
   vulnerabilities: Vulnerability[];
+  created_at?: string;
+  filename?: string;
 }
 
 export async function scanCode(code: string, language = 'python'): Promise<ScanResult> {
@@ -41,7 +44,7 @@ export async function getHistory(): Promise<{ scans: ScanResult[] }> {
 }
 
 export async function chatWithAI(
-  code: str,
+  code: string,
   vulnerability_details: string,
   user_question: string,
   language: string = "python"
@@ -49,7 +52,7 @@ export async function chatWithAI(
   const response = await fetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: json.stringify({
+    body: JSON.stringify({
       code,
       vulnerability_details,
       user_question,

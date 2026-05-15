@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Dimensions, Platform, ActivityIndicator,
+  StyleSheet, Dimensions, Platform, ActivityIndicator, Alert, TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { ScanResult, Vulnerability, getHistory } from '../api/scan';
 import { SeverityBadge } from '../components/SeverityBadge';
+import { exportMarkdownReport, rewriteSecure, simulateAttack, AttackSimulation, RewriteResult } from '../api/advanced';
 
 const { width } = Dimensions.get('window');
 
@@ -72,6 +73,12 @@ export default function ResultsScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(!route?.params?.result);
   const [activeCode, setActiveCode] = useState(initialCode);
   const [activeLang, setActiveLang] = useState(initialLang);
+  const [severityFilter, setSeverityFilter] = useState<'ALL' | Vulnerability['severity']>('ALL');
+  const [query, setQuery] = useState('');
+  const [working, setWorking] = useState<'rewrite' | 'attack' | 'report' | null>(null);
+  const [rewrite, setRewrite] = useState<RewriteResult | null>(null);
+  const [attack, setAttack] = useState<AttackSimulation | null>(null);
+  const [report, setReport] = useState('');
 
   const fetchLatest = async () => {
     try {
@@ -127,6 +134,47 @@ export default function ResultsScreen({ route, navigation }: any) {
 
   const { vulnerabilities, risk_score, summary } = result;
   const critHigh = vulnerabilities.filter(v => v.severity === 'CRITICAL' || v.severity === 'HIGH').length;
+  const filteredVulnerabilities = vulnerabilities.filter(v => {
+    const matchesSeverity = severityFilter === 'ALL' || v.severity === severityFilter;
+    const text = `${v.title} ${v.explanation} ${v.owasp ?? ''} ${v.cwe ?? ''}`.toLowerCase();
+    return matchesSeverity && text.includes(query.toLowerCase());
+  });
+  const firstFinding = filteredVulnerabilities[0] ?? vulnerabilities[0];
+
+  const handleRewrite = async () => {
+    if (!activeCode || vulnerabilities.length === 0) return;
+    setWorking('rewrite');
+    try {
+      setRewrite(await rewriteSecure(activeCode, vulnerabilities));
+    } catch (e: any) {
+      Alert.alert('Rewrite failed', e.message ?? 'Unknown error');
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const handleAttack = async () => {
+    if (!firstFinding) return;
+    setWorking('attack');
+    try {
+      setAttack(await simulateAttack(firstFinding));
+    } catch (e: any) {
+      Alert.alert('Attack simulation failed', e.message ?? 'Unknown error');
+    } finally {
+      setWorking(null);
+    }
+  };
+
+  const handleReport = async () => {
+    setWorking('report');
+    try {
+      setReport(await exportMarkdownReport(result));
+    } catch (e: any) {
+      Alert.alert('Report export failed', e.message ?? 'Unknown error');
+    } finally {
+      setWorking(null);
+    }
+  };
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -163,7 +211,42 @@ export default function ResultsScreen({ route, navigation }: any) {
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>DETAILED FINDINGS</Text>
-        <Text style={styles.findingsCount}>{vulnerabilities.length}</Text>
+        <Text style={styles.findingsCount}>{filteredVulnerabilities.length}</Text>
+      </View>
+
+      <TextInput
+        style={styles.searchInput}
+        value={query}
+        onChangeText={setQuery}
+        placeholder="Search findings"
+        placeholderTextColor="#484F58"
+      />
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+        {(['ALL', 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO'] as const).map(item => (
+          <TouchableOpacity
+            key={item}
+            style={[styles.filterBtn, severityFilter === item && styles.filterBtnActive]}
+            onPress={() => setSeverityFilter(item)}
+          >
+            <Text style={[styles.filterText, severityFilter === item && styles.filterTextActive]}>{item}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <View style={styles.actionsRow}>
+        <TouchableOpacity style={styles.actionBtn} onPress={handleRewrite} disabled={working !== null || vulnerabilities.length === 0}>
+          <Ionicons name="construct-outline" size={16} color="#00D1FF" />
+          <Text style={styles.actionText}>{working === 'rewrite' ? 'Rewriting...' : 'Rewrite'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} onPress={handleAttack} disabled={working !== null || vulnerabilities.length === 0}>
+          <Ionicons name="bug-outline" size={16} color="#00D1FF" />
+          <Text style={styles.actionText}>{working === 'attack' ? 'Simulating...' : 'Attack'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionBtn} onPress={handleReport} disabled={working !== null}>
+          <Ionicons name="document-text-outline" size={16} color="#00D1FF" />
+          <Text style={styles.actionText}>{working === 'report' ? 'Exporting...' : 'Report'}</Text>
+        </TouchableOpacity>
       </View>
 
       {vulnerabilities.length === 0 && (
@@ -174,7 +257,7 @@ export default function ResultsScreen({ route, navigation }: any) {
         </View>
       )}
 
-      {vulnerabilities.map(v => (
+      {filteredVulnerabilities.map(v => (
         <VulnRow 
           key={v.id} 
           v={v} 
@@ -183,6 +266,35 @@ export default function ResultsScreen({ route, navigation }: any) {
           navigation={navigation} 
         />
       ))}
+
+      {rewrite && (
+        <View style={styles.outputPanel}>
+          <Text style={styles.outputTitle}>Secure Rewrite</Text>
+          <Text style={styles.outputMeta}>Score {rewrite.security_score_before} to {rewrite.security_score_after}</Text>
+          {rewrite.changes.map((change, index) => (
+            <Text key={`${change.type}-${index}`} style={styles.outputText}>{change.type}: {change.description}</Text>
+          ))}
+          <Text style={styles.codeBlock}>{rewrite.rewritten_code}</Text>
+        </View>
+      )}
+
+      {attack && (
+        <View style={styles.outputPanel}>
+          <Text style={styles.outputTitle}>{attack.attack_name}</Text>
+          <Text style={styles.outputMeta}>Difficulty: {attack.difficulty}</Text>
+          {attack.steps.map(step => (
+            <Text key={step.number} style={styles.outputText}>{step.number}. {step.title}: {step.description}</Text>
+          ))}
+          <Text style={styles.outputText}>Impact: {attack.impact}</Text>
+        </View>
+      )}
+
+      {!!report && (
+        <View style={styles.outputPanel}>
+          <Text style={styles.outputTitle}>Markdown Report</Text>
+          <Text style={styles.codeBlock}>{report}</Text>
+        </View>
+      )}
       
       <TouchableOpacity 
         style={styles.newScanBtn}
@@ -241,6 +353,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 2, 
     borderRadius: 4 
   },
+  searchInput: {
+    backgroundColor: '#161B22',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#30363D',
+    color: '#E6EDF3',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  filterRow: { gap: 8, paddingBottom: 14 },
+  filterBtn: {
+    borderWidth: 1,
+    borderColor: '#30363D',
+    backgroundColor: '#161B22',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  filterBtnActive: { borderColor: '#00D1FF', backgroundColor: '#0D1117' },
+  filterText: { color: '#8B949E', fontSize: 11, fontWeight: '700' },
+  filterTextActive: { color: '#00D1FF' },
+  actionsRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  actionBtn: {
+    flex: 1,
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#161B22',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#30363D',
+  },
+  actionText: { color: '#00D1FF', fontSize: 12, fontWeight: '700' },
 
   vulnWrapper: {
     backgroundColor: '#161B22',
@@ -317,5 +465,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 15,
   },
+  outputPanel: {
+    backgroundColor: '#161B22',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#30363D',
+    padding: 16,
+    gap: 10,
+    marginTop: 12,
+  },
+  outputTitle: { color: '#E6EDF3', fontSize: 16, fontWeight: 'bold' },
+  outputMeta: { color: '#8B949E', fontSize: 12, fontWeight: '700' },
+  outputText: { color: '#C9D1D9', fontSize: 13, lineHeight: 20 },
+  codeBlock: {
+    backgroundColor: '#0D1117',
+    color: '#7EE787',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 12,
+    lineHeight: 18,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
 });
-

@@ -6,6 +6,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { scanCode } from '../api/scan';
+import { scanDependencies, scanRepo, DepScanResult, RepoScanResult } from '../api/advanced';
 
 const PLACEHOLDER = `# paste your code here
 import sqlite3
@@ -22,6 +23,12 @@ export default function ScanScreen({ navigation }: any) {
   const [code, setCode] = useState('');
   const [language, setLanguage] = useState('python');
   const [scanning, setScanning] = useState(false);
+  const [mode, setMode] = useState<'code' | 'deps' | 'repo'>('code');
+  const [filename, setFilename] = useState('requirements.txt');
+  const [repoUrl, setRepoUrl] = useState('');
+  const [depResult, setDepResult] = useState<DepScanResult | null>(null);
+  const [repoResult, setRepoResult] = useState<RepoScanResult | null>(null);
+  const [progress, setProgress] = useState('');
 
   const LANGUAGES = [
     { label: 'Python', value: 'python', icon: 'logo-python' },
@@ -32,6 +39,46 @@ export default function ScanScreen({ navigation }: any) {
   ];
 
   async function handleScan() {
+    if (mode === 'repo') {
+      if (!repoUrl.trim()) {
+        Alert.alert('Missing repository', 'Enter a GitHub repository URL.');
+        return;
+      }
+      setScanning(true);
+      setRepoResult(null);
+      setProgress('Starting repository scan...');
+      try {
+        const result = await scanRepo(repoUrl.trim(), (pct, message) => {
+          setProgress(`${pct}% - ${message}`);
+        });
+        setRepoResult(result);
+        setProgress('Repository scan complete.');
+      } catch (e: any) {
+        Alert.alert('Repo scan failed', e.message ?? 'Unknown error');
+      } finally {
+        setScanning(false);
+      }
+      return;
+    }
+
+    if (mode === 'deps') {
+      if (!code.trim()) {
+        Alert.alert('Empty dependency file', 'Paste requirements.txt or pyproject.toml content.');
+        return;
+      }
+      setScanning(true);
+      setDepResult(null);
+      try {
+        const result = await scanDependencies(code, filename || 'requirements.txt');
+        setDepResult(result);
+      } catch (e: any) {
+        Alert.alert('Dependency scan failed', e.message ?? 'Unknown error');
+      } finally {
+        setScanning(false);
+      }
+      return;
+    }
+
     if (!code.trim()) {
       Alert.alert('Empty code', 'Please paste some code to analyze.');
       return;
@@ -55,40 +102,82 @@ export default function ScanScreen({ navigation }: any) {
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>New Analysis</Text>
-        <Text style={styles.subtitle}>Select language and paste your source code below.</Text>
+        <Text style={styles.subtitle}>Choose a scan type and provide the source material.</Text>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.langScroll}>
-          {LANGUAGES.map((lang) => (
-            <TouchableOpacity 
-              key={lang.value} 
-              style={[styles.pill, language === lang.value && styles.pillActive]}
-              onPress={() => setLanguage(lang.value)}
+        <View style={styles.modeRow}>
+          {[
+            { label: 'Code', value: 'code', icon: 'code-slash-outline' },
+            { label: 'Deps', value: 'deps', icon: 'cube-outline' },
+            { label: 'Repo', value: 'repo', icon: 'git-branch-outline' },
+          ].map(item => (
+            <TouchableOpacity
+              key={item.value}
+              style={[styles.modeBtn, mode === item.value && styles.modeBtnActive]}
+              onPress={() => setMode(item.value as 'code' | 'deps' | 'repo')}
             >
-              <Ionicons 
-                name={lang.icon as any} 
-                size={14} 
-                color={language === lang.value ? '#00D1FF' : '#8B949E'} 
-              />
-              <Text style={[styles.pillText, language === lang.value && styles.pillTextActive]}>
-                {lang.label}
-              </Text>
+              <Ionicons name={item.icon as any} size={16} color={mode === item.value ? '#00D1FF' : '#8B949E'} />
+              <Text style={[styles.modeText, mode === item.value && styles.modeTextActive]}>{item.label}</Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
 
-        <View style={styles.inputContainer}>
+        {mode === 'code' && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.langScroll}>
+            {LANGUAGES.map((lang) => (
+              <TouchableOpacity 
+                key={lang.value} 
+                style={[styles.pill, language === lang.value && styles.pillActive]}
+                onPress={() => setLanguage(lang.value)}
+              >
+                <Ionicons 
+                  name={lang.icon as any} 
+                  size={14} 
+                  color={language === lang.value ? '#00D1FF' : '#8B949E'} 
+                />
+                <Text style={[styles.pillText, language === lang.value && styles.pillTextActive]}>
+                  {lang.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {mode === 'deps' && (
+          <TextInput
+            style={styles.filenameInput}
+            value={filename}
+            onChangeText={setFilename}
+            placeholder="requirements.txt"
+            placeholderTextColor="#484F58"
+            autoCapitalize="none"
+          />
+        )}
+
+        {mode === 'repo' && (
+          <TextInput
+            style={styles.filenameInput}
+            value={repoUrl}
+            onChangeText={setRepoUrl}
+            placeholder="https://github.com/org/repo"
+            placeholderTextColor="#484F58"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        )}
+
+        {mode !== 'repo' && <View style={styles.inputContainer}>
           <TextInput
             style={styles.codeInput}
             multiline
             value={code}
             onChangeText={setCode}
-            placeholder={PLACEHOLDER}
+            placeholder={mode === 'deps' ? 'fastapi==0.111.0\nrequests==2.19.0' : PLACEHOLDER}
             placeholderTextColor="#484F58"
             autoCapitalize="none"
             autoCorrect={false}
             spellCheck={false}
           />
-        </View>
+        </View>}
 
         <TouchableOpacity
           style={styles.scanBtnContainer}
@@ -103,16 +192,36 @@ export default function ScanScreen({ navigation }: any) {
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Text style={styles.scanBtnText}>Audit Snippet</Text>
+                <Text style={styles.scanBtnText}>
+                  {mode === 'code' ? 'Audit Snippet' : mode === 'deps' ? 'Scan Dependencies' : 'Scan Repository'}
+                </Text>
                 <Ionicons name="shield-checkmark-outline" size={20} color="#000" />
               </>
             )}
           </LinearGradient>
         </TouchableOpacity>
 
-        <Text style={styles.hint}>
-          Our AI engine will perform deep static analysis and provide secure fixes for any detected vulnerabilities.
-        </Text>
+        {!!progress && mode === 'repo' && <Text style={styles.hint}>{progress}</Text>}
+
+        {depResult && (
+          <View style={styles.resultPanel}>
+            <Text style={styles.panelTitle}>Dependency Results</Text>
+            <Text style={styles.panelText}>{depResult.vulnerable_count} of {depResult.total} dependencies are vulnerable.</Text>
+            {depResult.dependencies.filter(dep => dep.status === 'vulnerable').slice(0, 5).map(dep => (
+              <Text key={dep.name} style={styles.panelItem}>{dep.name}: {dep.severity} ({dep.vulns.length})</Text>
+            ))}
+          </View>
+        )}
+
+        {repoResult && (
+          <View style={styles.resultPanel}>
+            <Text style={styles.panelTitle}>Repository Results</Text>
+            <Text style={styles.panelText}>{repoResult.files_scanned} files scanned, {repoResult.total_vulnerabilities} findings.</Text>
+            {repoResult.results.slice(0, 5).map(item => (
+              <Text key={item.file} style={styles.panelItem}>{item.file}: {item.vulnerabilities.length} findings</Text>
+            ))}
+          </View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -173,5 +282,41 @@ const styles = StyleSheet.create({
   },
   scanBtnText: { color: '#000', fontWeight: 'bold', fontSize: 16, letterSpacing: 0.5 },
   hint: { fontSize: 12, color: '#484F58', textAlign: 'center', lineHeight: 18, paddingHorizontal: 20 },
+  modeRow: { flexDirection: 'row', gap: 8 },
+  modeBtn: {
+    flex: 1,
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#30363D',
+    backgroundColor: '#161B22',
+    borderRadius: 12,
+  },
+  modeBtnActive: { borderColor: '#00D1FF', backgroundColor: '#0D1117' },
+  modeText: { color: '#8B949E', fontWeight: '700', fontSize: 13 },
+  modeTextActive: { color: '#00D1FF' },
+  filenameInput: {
+    backgroundColor: '#161B22',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#30363D',
+    color: '#E6EDF3',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  resultPanel: {
+    backgroundColor: '#161B22',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#30363D',
+    padding: 16,
+    gap: 8,
+  },
+  panelTitle: { color: '#E6EDF3', fontWeight: 'bold', fontSize: 16 },
+  panelText: { color: '#8B949E', fontSize: 13 },
+  panelItem: { color: '#C9D1D9', fontSize: 12, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
 });
-

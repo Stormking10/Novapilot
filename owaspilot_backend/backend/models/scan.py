@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from enum import Enum
+from datetime import datetime
 
 
 class Severity(str, Enum):
@@ -46,8 +47,11 @@ class Vulnerability(BaseModel):
 
 class ScanResult(BaseModel):
     scan_id: str
+    id: Optional[str] = None
     language: Language
     risk_score: int                      # 0–100
     summary: str
     vulnerabilities: list[Vulnerability]
+    created_at: Optional[datetime] = None
+    filename: Optional[str] = None
     scanner_output: Optional[dict] = None  # raw Semgrep JSON (debug)

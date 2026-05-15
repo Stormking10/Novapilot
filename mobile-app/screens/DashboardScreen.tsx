@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { getHistory, ScanResult } from '../api/scan';
 import modules from '../data/learning_modules.json';
+import profile from '../data/user_profile.json';
 
 const { width } = Dimensions.get('window');
 
@@ -80,6 +81,15 @@ export default function DashboardScreen({ navigation }: any) {
           colors={['#1A1D23', '#0D1117']}
           style={styles.postureCard}
         >
+          <View style={styles.profileRow}>
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={20} color="#00D1FF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.profileName}>{profile.displayName}</Text>
+              <Text style={styles.profileMeta}>{profile.role} - {profile.team}</Text>
+            </View>
+          </View>
           <View style={styles.postureHeader}>
             <View>
               <Text style={styles.postureTitle}>Security Posture</Text>
@@ -149,7 +159,7 @@ export default function DashboardScreen({ navigation }: any) {
         ) : (
           history.slice(0, 5).map((scan) => (
             <TouchableOpacity 
-              key={scan.id} 
+              key={scan.id ?? scan.scan_id} 
               style={styles.activityCard}
               onPress={() => navigation.navigate('Results', { result: scan })}
             >
@@ -163,7 +173,7 @@ export default function DashboardScreen({ navigation }: any) {
               <View style={styles.activityInfo}>
                 <Text style={styles.activityTitle} numberOfLines={1}>{scan.summary}</Text>
                 <Text style={styles.activityDate}>
-                  {new Date(scan.created_at).toLocaleDateString()} • {scan.vulnerabilities.length} findings
+                  {scan.created_at ? new Date(scan.created_at).toLocaleDateString() : 'Recent'} - {scan.vulnerabilities.length} findings
                 </Text>
               </View>
               <View style={styles.scoreIndicator}>
@@ -218,6 +228,32 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 24,
+  },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#0D1117',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#30363D',
+  },
+  profileName: {
+    color: '#E6EDF3',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  profileMeta: {
+    color: '#8B949E',
+    fontSize: 12,
+    marginTop: 2,
   },
   postureTitle: {
     fontSize: 14,

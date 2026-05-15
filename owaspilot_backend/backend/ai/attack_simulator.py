@@ -31,6 +31,31 @@ async def simulate_attack(vulnerability: dict) -> dict:
     """
     vulnerability: dict with keys title, severity, explanation, owasp, fix
     """
+    if not ANTHROPIC_API_KEY:
+        return {
+            "attack_name": vulnerability.get("title", "Security finding walkthrough"),
+            "difficulty": "Medium",
+            "steps": [
+                {
+                    "number": 1,
+                    "title": "Identify the vulnerable behavior",
+                    "description": vulnerability.get("explanation", "Review the finding and locate the unsafe code path."),
+                },
+                {
+                    "number": 2,
+                    "title": "Trace attacker-controlled input",
+                    "description": "Follow how user input reaches the affected line and what trust boundary it crosses.",
+                },
+                {
+                    "number": 3,
+                    "title": "Apply and verify the mitigation",
+                    "description": vulnerability.get("fix", "Apply the recommended fix and rerun the scanner."),
+                },
+            ],
+            "impact": "Impact depends on the vulnerable code path and the data or privileges it can reach.",
+            "mitigations": [vulnerability.get("fix", "Apply the recommended secure coding fix.")],
+        }
+
     user = f"Vulnerability:\n{json.dumps(vulnerability, indent=2)}"
 
     async with httpx.AsyncClient(timeout=30) as client:

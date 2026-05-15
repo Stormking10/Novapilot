@@ -1,79 +1,81 @@
-# OWASPilot — Backend
+# Novapilot
 
-AI-powered Python vulnerability scanner. FastAPI + Semgrep + Claude/OpenAI.
+AI-assisted secure coding companion with a FastAPI backend and Expo mobile app.
 
-## Quick start
+## What It Does
+
+- Scans pasted source code with Semgrep and AI enrichment.
+- Stores scan history locally for dashboard trend views.
+- Supports follow-up security chat for individual findings.
+- Runs dependency checks against OSV.dev.
+- Scans GitHub repositories for Python security findings.
+- Generates attack walkthroughs, secure rewrite suggestions, and Markdown reports.
+- Includes an OWASP learning path and lightweight local user profile.
+
+## Project Layout
+
+```text
+mobile-app/                 Expo React Native app
+owaspilot_backend/backend/  FastAPI backend
+```
+
+## Backend Setup
 
 ```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
+cd owaspilot_backend/backend
+python -m venv .venv
+.venv\Scripts\activate
 pip install -r requirements.txt
-
-cp .env.example .env        # add your ANTHROPIC_API_KEY
+copy .env.example .env
 uvicorn main:app --reload
 ```
 
-API is live at `http://localhost:8000`
-Swagger docs at `http://localhost:8000/docs`
+The API runs at `http://localhost:8000`.
 
-## Endpoints
+Optional environment variables:
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check |
-| POST | `/api/scan` | Scan code for vulnerabilities |
-| GET | `/api/history` | Return past scan results |
-
-## POST /api/scan
-
-**Request**
-```json
-{
-  "code": "import sqlite3\ndef get(u): ...",
-  "language": "python",
-  "filename": "app.py"
-}
+```text
+ANTHROPIC_API_KEY=
+OPENAI_API_KEY=
 ```
 
-**Response**
-```json
-{
-  "scan_id": "uuid",
-  "language": "python",
-  "risk_score": 85,
-  "summary": "Critical SQL injection found.",
-  "vulnerabilities": [
-    {
-      "id": "vuln-1",
-      "title": "SQL Injection via f-string",
-      "severity": "CRITICAL",
-      "line": "7",
-      "owasp": "A03:2021",
-      "rule_id": "python.lang.security.audit.formatted-sql-query",
-      "explanation": "...",
-      "fix": "cursor.execute('SELECT * FROM users WHERE name = ?', (username,))",
-      "cwe": "CWE-89"
-    }
-  ]
-}
+Without an AI key, Semgrep still runs and advanced AI endpoints return useful fallback responses.
+
+## Mobile Setup
+
+```bash
+cd mobile-app
+npm install
+copy .env.example .env
+npm run start
 ```
 
-## Architecture
+If testing on a physical device, set `EXPO_PUBLIC_API_URL` to your computer's LAN address, for example:
 
+```text
+EXPO_PUBLIC_API_URL=http://192.168.1.20:8000/api
 ```
-backend/
-├── main.py               # FastAPI app + CORS
-├── requirements.txt
-├── .env.example
-├── models/
-│   └── scan.py           # Pydantic request/response models
-├── scanners/
-│   └── semgrep.py        # Semgrep wrapper + result normaliser
-├── ai/
-│   └── explainer.py      # LLM explanation engine (Anthropic / OpenAI)
-├── routes/
-│   ├── health.py
-│   ├── scan.py           # POST /api/scan — main pipeline
-│   └── history.py        # GET /api/history
-└── services/             # (Phase 2) Supabase client, auth, etc.
+
+## Useful Commands
+
+```bash
+cd mobile-app
+npm run typecheck
 ```
+
+```bash
+cd owaspilot_backend/backend
+python -m pytest
+```
+
+## API Endpoints
+
+- `GET /api/health`
+- `POST /api/scan`
+- `GET /api/history`
+- `POST /api/chat`
+- `POST /api/attack-simulate`
+- `POST /api/repo-scan`
+- `POST /api/dep-scan`
+- `POST /api/rewrite`
+- `POST /api/report`

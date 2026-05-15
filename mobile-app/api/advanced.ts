@@ -49,7 +49,18 @@ export async function scanRepo(
   });
   if (!res.ok) throw new Error(`Repo scan failed: ${res.status}`);
 
-  const reader = res.body!.getReader();
+  if (!res.body || !(res.body as any).getReader) {
+    const text = await res.text();
+    const events = text.split('\n\n').filter(line => line.startsWith('data: '));
+    for (const event of events) {
+      const data = JSON.parse(event.slice(6));
+      if (data.pct !== undefined) onProgress(data.pct, data.message);
+      if (data.result) return data.result;
+    }
+    throw new Error('Repo scan response did not include a result');
+  }
+
+  const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
 
@@ -128,4 +139,14 @@ export async function rewriteSecure(
   });
   if (!res.ok) throw new Error(`Rewrite failed: ${res.status}`);
   return res.json();
+}
+
+export async function exportMarkdownReport(result: object): Promise<string> {
+  const res = await fetch(`${API_BASE}/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ result }),
+  });
+  if (!res.ok) throw new Error(`Report export failed: ${res.status}`);
+  return res.text();
 }

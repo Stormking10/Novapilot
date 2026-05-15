@@ -3,10 +3,12 @@ routes/scan.py
 POST /api/scan  — the main vulnerability scanning endpoint
 """
 import uuid
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 from models.scan import ScanRequest, ScanResult, Vulnerability, Language
 from scanners.semgrep import run_semgrep
 from ai.explainer import explain_vulnerabilities
+from services.history_store import save_scan
 
 router = APIRouter()
 
@@ -56,11 +58,17 @@ async def scan_code(req: ScanRequest) -> ScanResult:
             cwe         = v.get("cwe") or sg.get("cwe"),
         ))
 
-    return ScanResult(
-        scan_id         = str(uuid.uuid4()),
+    scan_id = str(uuid.uuid4())
+    result = ScanResult(
+        scan_id         = scan_id,
+        id              = scan_id,
         language        = req.language,
         risk_score      = int(ai_result.get("risk_score", 0)),
         summary         = ai_result.get("summary", ""),
         vulnerabilities = vulns,
+        created_at      = datetime.now(timezone.utc),
+        filename        = req.filename,
         scanner_output  = semgrep_out.get("raw"),
     )
+    save_scan(result.model_dump(mode="json"))
+    return result
