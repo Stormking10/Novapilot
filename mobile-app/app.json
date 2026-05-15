@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "novapilot",
+    "slug": "novapilot",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

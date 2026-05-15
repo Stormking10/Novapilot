@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, ActivityIndicator, Alert,
+  StyleSheet, ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { scanCode } from '../api/scan';
 
-const PLACEHOLDER = `# paste your Python code here
+const PLACEHOLDER = `# paste your code here
 import sqlite3
 
 def get_user(username):
@@ -22,22 +24,23 @@ export default function ScanScreen({ navigation }: any) {
   const [scanning, setScanning] = useState(false);
 
   const LANGUAGES = [
-    { label: 'Python', value: 'python' },
-    { label: 'JS/TS', value: 'javascript' },
-    { label: 'Go', value: 'go' },
-    { label: 'Java', value: 'java' },
-    { label: 'C#', value: 'csharp' }
+    { label: 'Python', value: 'python', icon: 'logo-python' },
+    { label: 'JS/TS', value: 'javascript', icon: 'logo-javascript' },
+    { label: 'Go', value: 'go', icon: 'code-slash' },
+    { label: 'Java', value: 'java', icon: 'cafe' },
+    { label: 'C#', value: 'csharp', icon: 'code-slash' }
   ];
 
   async function handleScan() {
     if (!code.trim()) {
-      Alert.alert('No code', 'Please paste some Python code to scan.');
+      Alert.alert('Empty code', 'Please paste some code to analyze.');
       return;
     }
     setScanning(true);
     try {
       const result = await scanCode(code, language);
-      navigation.navigate('Results', { result });
+      setCode(''); // Clear the input for the next scan
+      navigation.navigate('Results', { result, code, language });
     } catch (e: any) {
       Alert.alert('Scan failed', e.message ?? 'Unknown error');
     } finally {
@@ -46,94 +49,129 @@ export default function ScanScreen({ navigation }: any) {
   }
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.langScroll}>
-        {LANGUAGES.map((lang) => (
-          <TouchableOpacity 
-            key={lang.value} 
-            style={[styles.pill, language === lang.value && styles.pillActive]}
-            onPress={() => setLanguage(lang.value)}
+    <KeyboardAvoidingView 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.root}
+    >
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Text style={styles.title}>New Analysis</Text>
+        <Text style={styles.subtitle}>Select language and paste your source code below.</Text>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.langScroll}>
+          {LANGUAGES.map((lang) => (
+            <TouchableOpacity 
+              key={lang.value} 
+              style={[styles.pill, language === lang.value && styles.pillActive]}
+              onPress={() => setLanguage(lang.value)}
+            >
+              <Ionicons 
+                name={lang.icon as any} 
+                size={14} 
+                color={language === lang.value ? '#00D1FF' : '#8B949E'} 
+              />
+              <Text style={[styles.pillText, language === lang.value && styles.pillTextActive]}>
+                {lang.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.codeInput}
+            multiline
+            value={code}
+            onChangeText={setCode}
+            placeholder={PLACEHOLDER}
+            placeholderTextColor="#484F58"
+            autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
+          />
+        </View>
+
+        <TouchableOpacity
+          style={styles.scanBtnContainer}
+          onPress={handleScan}
+          disabled={scanning}
+        >
+          <LinearGradient
+            colors={scanning ? ['#003E4D', '#003E4D'] : ['#00D1FF', '#00A3FF']}
+            style={styles.scanBtn}
           >
-            <View style={[styles.pillDot, language === lang.value && styles.pillDotActive]} />
-            <Text style={[styles.pillText, language === lang.value && styles.pillTextActive]}>
-              {lang.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+            {scanning ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.scanBtnText}>Audit Snippet</Text>
+                <Ionicons name="shield-checkmark-outline" size={20} color="#000" />
+              </>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+
+        <Text style={styles.hint}>
+          Our AI engine will perform deep static analysis and provide secure fixes for any detected vulnerabilities.
+        </Text>
       </ScrollView>
-
-      <Text style={styles.label}>Paste your {LANGUAGES.find(l => l.value === language)?.label || 'code'} code</Text>
-      <TextInput
-        style={styles.codeInput}
-        multiline
-        value={code}
-        onChangeText={setCode}
-        placeholder={PLACEHOLDER}
-        placeholderTextColor="#AAA"
-        autoCapitalize="none"
-        autoCorrect={false}
-        spellCheck={false}
-      />
-
-      <TouchableOpacity
-        style={[styles.scanBtn, scanning && styles.scanBtnDisabled]}
-        onPress={handleScan}
-        disabled={scanning}
-      >
-        {scanning
-          ? <ActivityIndicator color="#fff" />
-          : <Text style={styles.scanBtnText}>Scan for vulnerabilities</Text>
-        }
-      </TouchableOpacity>
-
-      <Text style={styles.hint}>
-        Powered by Semgrep static analysis + Claude AI explanation engine.
-        Results appear on the Results tab.
-      </Text>
-    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0D1117' },
-  content: { padding: 20, gap: 14 },
-  langScroll: { gap: 8, paddingBottom: 10 },
+  content: { padding: 24, gap: 16 },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#E6EDF3' },
+  subtitle: { fontSize: 14, color: '#8B949E', marginBottom: 8 },
+  
+  langScroll: { gap: 10, paddingBottom: 10 },
   pill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: '#21262D', borderRadius: 99,
-    paddingHorizontal: 12, paddingVertical: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#161B22', borderRadius: 99,
+    paddingHorizontal: 16, paddingVertical: 10,
     borderWidth: 1, borderColor: '#30363D',
   },
   pillActive: {
-    backgroundColor: '#161B22',
     borderColor: '#00D1FF',
+    backgroundColor: '#0D1117',
   },
-  pillDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#484F58' },
-  pillDotActive: { backgroundColor: '#00D1FF', shadowColor: '#00D1FF', shadowRadius: 4, shadowOpacity: 0.8 },
-  pillText: { fontSize: 12, color: '#8B949E', fontWeight: '500' },
-  pillTextActive: { color: '#00D1FF', fontWeight: 'bold' },
-  label: { fontSize: 13, fontWeight: '600', color: '#C9D1D9', marginBottom: 4 },
-  codeInput: {
+  pillText: { fontSize: 13, color: '#8B949E', fontWeight: '600' },
+  pillTextActive: { color: '#00D1FF' },
+
+  inputContainer: {
     backgroundColor: '#161B22',
-    borderRadius: 12,
-    padding: 16,
-    fontFamily: 'monospace',
-    fontSize: 13,
-    color: '#E6EDF3',
-    minHeight: 280,
-    textAlignVertical: 'top',
-    lineHeight: 20,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#30363D',
+    overflow: 'hidden',
+  },
+  codeInput: {
+    padding: 16,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 14,
+    color: '#E6EDF3',
+    minHeight: 350,
+    textAlignVertical: 'top',
+  },
+
+  scanBtnContainer: {
+    marginTop: 8,
+    borderRadius: 14,
+    overflow: 'hidden',
+    elevation: 8,
+    shadowColor: '#00D1FF',
+    shadowOpacity: 0.3,
+    shadowRadius: 15,
+    shadowOffset: { width: 0, height: 4 },
   },
   scanBtn: {
-    backgroundColor: '#00D1FF', borderRadius: 12,
-    padding: 16, alignItems: 'center',
-    shadowColor: '#00D1FF', shadowOpacity: 0.5, shadowRadius: 10, 
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 8,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
   },
-  scanBtnDisabled: { opacity: 0.5, backgroundColor: '#006680' },
   scanBtnText: { color: '#000', fontWeight: 'bold', fontSize: 16, letterSpacing: 0.5 },
-  hint: { fontSize: 12, color: '#484F58', textAlign: 'center', lineHeight: 18, marginTop: 10 },
+  hint: { fontSize: 12, color: '#484F58', textAlign: 'center', lineHeight: 18, paddingHorizontal: 20 },
 });
+

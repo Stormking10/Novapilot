@@ -39,3 +39,26 @@ export async function getHistory(): Promise<{ scans: ScanResult[] }> {
   const response = await fetch(`${API_BASE}/history`);
   return response.json();
 }
+
+export async function chatWithAI(
+  code: str,
+  vulnerability_details: string,
+  user_question: string,
+  language: string = "python"
+): Promise<{ answer: string }> {
+  const response = await fetch(`${API_BASE}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: json.stringify({
+      code,
+      vulnerability_details,
+      user_question,
+      language
+    }),
+  });
+  if (!response.ok) {
+    const err = await response.json();
+    throw new Error(err.detail || 'Chat failed');
+  }
+  return response.json();
+}

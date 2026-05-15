@@ -1,108 +1,407 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View, Text, ScrollView, StyleSheet,
-  TouchableOpacity, ActivityIndicator,
+import React, { useState, useEffect } from 'react';
+import { 
+  View, Text, StyleSheet, ScrollView, RefreshControl, 
+  TouchableOpacity, ActivityIndicator, Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { getHistory, ScanResult } from '../api/scan';
-import { SeverityBadge } from '../components/SeverityBadge';
+import modules from '../data/learning_modules.json';
+
+const { width } = Dimensions.get('window');
 
 const RISK_COLOR = (s: number) => s >= 70 ? '#FF4D4D' : s >= 40 ? '#D29922' : '#3FB950';
 
 export default function DashboardScreen({ navigation }: any) {
   const [history, setHistory] = useState<ScanResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchHistory = async () => {
+    try {
+      const data = await getHistory();
+      setHistory(data.scans || []);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    getHistory()
-      .then(h => setHistory(h.scans))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+    fetchHistory();
+    const unsubscribe = navigation.addListener('focus', fetchHistory);
+    return unsubscribe;
+  }, [navigation]);
 
-  const allVulns = history.flatMap(s => s.vulnerabilities);
-  const openIssues = allVulns.length;
-  const critHigh = allVulns.filter(v => v.severity === 'CRITICAL' || v.severity === 'HIGH').length;
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchHistory();
+  };
+
+  const totalIssues = history.reduce((acc, scan) => acc + scan.vulnerabilities.length, 0);
+  const criticalIssues = history.reduce((acc, scan) => 
+    acc + scan.vulnerabilities.filter(v => v.severity === 'CRITICAL' || v.severity === 'HIGH').length, 0
+  );
+  
+  // Learning Mastery Calculations
+  const completedModules = modules.filter(m => m.mastery === 1).length;
+  const avgMastery = modules.reduce((acc, m) => acc + m.mastery, 0) / modules.length;
   const avgRisk = history.length
     ? Math.round(history.reduce((a, s) => a + s.risk_score, 0) / history.length)
     : 0;
+  
+  const getRank = () => {
+    if (avgMastery >= 0.9) return { title: 'Elite Auditor', color: '#00D1FF' };
+    if (avgMastery >= 0.6) return { title: 'Security Hunter', color: '#3FB950' };
+    if (avgMastery >= 0.3) return { title: 'Guardian', color: '#D29922' };
+    return { title: 'Novice', color: '#8B949E' };
+  };
+  
+  const rank = getRank();
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color="#00D1FF" />
+      </View>
+    );
+  }
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <Text style={styles.greeting}>Good morning, dev</Text>
-
-      <View style={styles.metricsGrid}>
-        {[
-          { label: 'Total scans', value: history.length, color: '#C9D1D9' },
-          { label: 'Open issues', value: openIssues, color: '#FF4D4D' },
-          { label: 'Critical/High', value: critHigh, color: '#FF7B72' },
-          { label: 'Avg risk', value: avgRisk, color: RISK_COLOR(avgRisk) },
-        ].map(m => (
-          <View key={m.label} style={styles.metricCard}>
-            <Text style={styles.metricLabel}>{m.label}</Text>
-            <Text style={[styles.metricValue, { color: m.color }]}>{m.value}</Text>
-          </View>
-        ))}
-      </View>
-
-      <Text style={styles.sectionTitle}>Recent scans</Text>
-      {loading && <ActivityIndicator style={{ marginTop: 20 }} />}
-      {history.slice(0, 5).map(scan => (
-        <TouchableOpacity
-          key={scan.scan_id}
-          style={styles.historyRow}
-          onPress={() => navigation.navigate('Results', { result: scan })}
-        >
-          <View style={styles.historyInfo}>
-            <Text style={styles.historyName} numberOfLines={1}>{scan.summary}</Text>
-            <Text style={styles.historyMeta}>{scan.vulnerabilities.length} findings</Text>
-          </View>
-          <Text style={[styles.historyScore, { color: RISK_COLOR(scan.risk_score) }]}>
-            {scan.risk_score}/100
-          </Text>
-        </TouchableOpacity>
-      ))}
-
-      {history.length === 0 && !loading && (
-        <Text style={styles.empty}>No scans yet — go to Scanner to get started.</Text>
-      )}
-
-      <TouchableOpacity
-        style={styles.primaryBtn}
-        onPress={() => navigation.navigate('Scan')}
+    <View style={styles.container}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#00D1FF" />}
       >
-        <Text style={styles.primaryBtnText}>New scan →</Text>
+        {/* Posture Card */}
+        <LinearGradient
+          colors={['#1A1D23', '#0D1117']}
+          style={styles.postureCard}
+        >
+          <View style={styles.postureHeader}>
+            <View>
+              <Text style={styles.postureTitle}>Security Posture</Text>
+              <View style={[styles.rankBadge, { borderColor: rank.color }]}>
+                <Text style={[styles.rankText, { color: rank.color }]}>{rank.title}</Text>
+              </View>
+            </View>
+            <View style={[styles.scoreCircle, { borderColor: RISK_COLOR(avgRisk) }]}>
+              <Text style={styles.scoreText}>{avgRisk}</Text>
+              <Text style={styles.scoreLabel}>RISK</Text>
+            </View>
+          </View>
+          
+          <View style={styles.statsGrid}>
+            <View style={styles.statBox}>
+              <Text style={styles.statValue}>{totalIssues}</Text>
+              <Text style={styles.statLabel}>Open Issues</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={[styles.statValue, { color: '#F85149' }]}>{criticalIssues}</Text>
+              <Text style={styles.statLabel}>Critical/High</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statValue}>{completedModules}</Text>
+              <Text style={styles.statLabel}>Mastered</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* Learning Growth Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Learning Growth</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Learn')}>
+            <Text style={styles.seeAll}>Resume Training</Text>
+          </TouchableOpacity>
+        </View>
+        
+        <TouchableOpacity 
+          style={styles.learningCard}
+          onPress={() => navigation.navigate('Learn')}
+        >
+          <View style={styles.learningInfo}>
+            <View style={styles.learningIcon}>
+              <Ionicons name="school" size={24} color="#00D1FF" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.learningTitle}>OWASP Knowledge</Text>
+              <Text style={styles.learningSub}>You've mastered {completedModules}/10 topics</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#30363D" />
+          </View>
+          <View style={styles.learningProgress}>
+            <View style={[styles.learningBar, { width: `${avgMastery * 100}%` }]} />
+          </View>
+        </TouchableOpacity>
+
+        {/* Recent Activity */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Recent Activity</Text>
+        </View>
+
+        {history.length === 0 ? (
+          <View style={styles.empty}>
+            <Ionicons name="shield-checkmark-outline" size={48} color="#30363D" />
+            <Text style={styles.emptyText}>No recent scans</Text>
+          </View>
+        ) : (
+          history.slice(0, 5).map((scan) => (
+            <TouchableOpacity 
+              key={scan.id} 
+              style={styles.activityCard}
+              onPress={() => navigation.navigate('Results', { result: scan })}
+            >
+              <View style={styles.activityIcon}>
+                <Ionicons 
+                  name={scan.language === 'python' ? 'logo-python' : 'code-slash-outline'} 
+                  size={20} 
+                  color="#00D1FF" 
+                />
+              </View>
+              <View style={styles.activityInfo}>
+                <Text style={styles.activityTitle} numberOfLines={1}>{scan.summary}</Text>
+                <Text style={styles.activityDate}>
+                  {new Date(scan.created_at).toLocaleDateString()} • {scan.vulnerabilities.length} findings
+                </Text>
+              </View>
+              <View style={styles.scoreIndicator}>
+                 <Text style={[styles.scoreMini, { color: RISK_COLOR(scan.risk_score) }]}>{scan.risk_score}</Text>
+                 <Ionicons name="chevron-forward" size={14} color="#30363D" />
+              </View>
+            </TouchableOpacity>
+          ))
+        )}
+      </ScrollView>
+
+      {/* FAB for Scanner */}
+      <TouchableOpacity 
+        style={styles.fab}
+        onPress={() => navigation.navigate('Scanner')}
+      >
+        <LinearGradient
+          colors={['#00D1FF', '#007AFF']}
+          style={styles.fabGradient}
+        >
+          <Ionicons name="add" size={32} color="#0D1117" />
+        </LinearGradient>
       </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0D1117' },
-  content: { padding: 20, gap: 12 },
-  greeting: { fontSize: 24, fontWeight: 'bold', color: '#E6EDF3', marginBottom: 4 },
-  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  metricCard: {
-    width: '48%', backgroundColor: '#161B22',
-    borderRadius: 12, padding: 16,
-    borderWidth: 1, borderColor: '#30363D',
+  container: {
+    flex: 1,
+    backgroundColor: '#0D1117',
   },
-  metricLabel: { fontSize: 12, color: '#8B949E', marginBottom: 4, fontWeight: '500' },
-  metricValue: { fontSize: 26, fontWeight: 'bold', color: '#E6EDF3' },
-  sectionTitle: { fontSize: 14, fontWeight: '600', color: '#8B949E', letterSpacing: 0.5, marginTop: 12, textTransform: 'uppercase' },
-  historyRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#1A1D23',
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 100,
   },
-  historyInfo: { flex: 1 },
-  historyName: { fontSize: 14, fontWeight: '600', color: '#E6EDF3' },
-  historyMeta: { fontSize: 12, color: '#484F58', marginTop: 3 },
-  historyScore: { fontSize: 14, fontWeight: 'bold', fontFamily: 'monospace' },
-  empty: { color: '#484F58', fontSize: 13, textAlign: 'center', marginTop: 30 },
-  primaryBtn: {
-    backgroundColor: '#00D1FF', borderRadius: 12,
-    padding: 16, alignItems: 'center', marginTop: 20,
-    shadowColor: '#00D1FF', shadowOpacity: 0.4, shadowRadius: 10,
-    elevation: 5,
+  loading: {
+    flex: 1,
+    backgroundColor: '#0D1117',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  primaryBtnText: { color: '#000', fontWeight: 'bold', fontSize: 15 },
+  postureCard: {
+    borderRadius: 20,
+    padding: 24,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#30363D',
+  },
+  postureHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 24,
+  },
+  postureTitle: {
+    fontSize: 14,
+    color: '#8B949E',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  rankBadge: {
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  rankText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  scoreCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+  },
+  scoreText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  scoreLabel: {
+    fontSize: 8,
+    color: '#8B949E',
+    marginTop: -2,
+    fontWeight: 'bold',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statBox: {
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#8B949E',
+    marginTop: 4,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#E6EDF3',
+  },
+  seeAll: {
+    fontSize: 14,
+    color: '#00D1FF',
+  },
+  learningCard: {
+    backgroundColor: '#161B22',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#30363D',
+  },
+  learningInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  learningIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#0D1117',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  learningTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  learningSub: {
+    fontSize: 13,
+    color: '#8B949E',
+    marginTop: 2,
+  },
+  learningProgress: {
+    height: 4,
+    backgroundColor: '#0D1117',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  learningBar: {
+    height: '100%',
+    backgroundColor: '#00D1FF',
+  },
+  activityCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#161B22',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#30363D',
+  },
+  activityIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0D1117',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  activityInfo: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#E6EDF3',
+  },
+  activityDate: {
+    fontSize: 12,
+    color: '#8B949E',
+    marginTop: 2,
+  },
+  scoreIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  scoreMini: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+  },
+  empty: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    color: '#484F58',
+    marginTop: 12,
+    fontSize: 16,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    elevation: 8,
+    shadowColor: '#00D1FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  fabGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

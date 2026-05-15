@@ -1,106 +1,203 @@
-import React, { useState } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  StyleSheet, Linking,
+import React from 'react';
+import { 
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, 
+  Dimensions 
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import modules from '../data/learning_modules.json';
 
-interface Topic {
-  id: string;
-  owasp: string;
-  title: string;
-  description: string;
-  progress: number; // 0–100
-  color: string;
-  bgColor: string;
-  link: string;
-}
-
-const TOPICS: Topic[] = [
-  { id: 'a03', owasp: 'A03:2021', title: 'SQL injection', description: 'Parameterised queries, ORMs, input validation', progress: 100, color: '#A32D2D', bgColor: '#FCEBEB', link: 'https://owasp.org/Top10/A03_2021-Injection/' },
-  { id: 'a07', owasp: 'A07:2021', title: 'Broken authentication', description: 'Session management, JWT pitfalls, MFA', progress: 60, color: '#854F0B', bgColor: '#FAEEDA', link: 'https://owasp.org/Top10/A07_2021-Identification_and_Authentication_Failures/' },
-  { id: 'a08', owasp: 'A08:2021', title: 'Insecure deserialization', description: 'pickle risks, JSON alternatives, type validation', progress: 0, color: '#185FA5', bgColor: '#E6F1FB', link: 'https://owasp.org/Top10/A08_2021-Software_and_Data_Integrity_Failures/' },
-  { id: 'a02', owasp: 'A02:2021', title: 'Cryptographic failures', description: 'Secrets management, env vars, key rotation', progress: 0, color: '#185FA5', bgColor: '#E6F1FB', link: 'https://owasp.org/Top10/A02_2021-Cryptographic_Failures/' },
-  { id: 'a10', owasp: 'A10:2021', title: 'SSRF', description: 'URL validation, allow-listing, network segmentation', progress: 0, color: '#0F6E56', bgColor: '#E1F5EE', link: 'https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/' },
-  { id: 'a01', owasp: 'A01:2021', title: 'Broken access control', description: 'RBAC, resource ownership checks, deny by default', progress: 0, color: '#185FA5', bgColor: '#E6F1FB', link: 'https://owasp.org/Top10/A01_2021-Broken_Access_Control/' },
-];
-
-function TopicRow({ topic, onComplete }: { topic: Topic; onComplete: () => void }) {
-  return (
-    <TouchableOpacity style={styles.topicRow} onPress={() => Linking.openURL(topic.link)} activeOpacity={0.7}>
-      <View style={[styles.topicIcon, { backgroundColor: topic.bgColor }]}>
-        <Text style={{ color: topic.color, fontSize: 13, fontWeight: '600' }}>
-          {topic.owasp.slice(0, 3)}
-        </Text>
-      </View>
-      <View style={styles.topicBody}>
-        <Text style={styles.topicTitle}>{topic.title}</Text>
-        <Text style={styles.topicDesc}>{topic.description}</Text>
-        <View style={styles.progressBg}>
-          <View style={[styles.progressFill, { width: `${topic.progress}%` }]} />
-        </View>
-      </View>
-      <View style={[styles.topicBadge, { backgroundColor: topic.bgColor }]}>
-        <Text style={[styles.topicBadgeText, { color: topic.color }]}>
-          {topic.progress === 100 ? 'Done' : topic.progress > 0 ? `${topic.progress}%` : 'Start →'}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-export default function LearnScreen() {
-  const [topics] = useState(TOPICS);
-  const done = topics.filter(t => t.progress === 100).length;
-  const pct = Math.round((done / topics.length) * 100);
+export default function LearnScreen({ navigation }: any) {
+  const totalMastery = modules.reduce((acc, m) => acc + m.mastery, 0) / modules.length;
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <View style={styles.progressCard}>
-        <View style={styles.progressHeader}>
-          <Text style={styles.progressTitle}>{done} of {topics.length} topics complete</Text>
-          <Text style={styles.progressPct}>{pct}%</Text>
+    <ScrollView style={styles.container}>
+      <LinearGradient
+        colors={['#1A1D23', '#0D1117']}
+        style={styles.header}
+      >
+        <View style={styles.statsRow}>
+          <View>
+            <Text style={styles.title}>Learning Path</Text>
+            <Text style={styles.subtitle}>OWASP Top 10 Mastery</Text>
+          </View>
+          <View style={styles.masteryCircle}>
+            <Text style={styles.masteryText}>{Math.round(totalMastery * 100)}%</Text>
+          </View>
         </View>
-        <View style={styles.progressBg}>
-          <View style={[styles.progressFill, { width: `${pct}%` }]} />
-        </View>
+      </LinearGradient>
+
+      <View style={styles.listContainer}>
+        {modules.map((item) => (
+          <View key={item.id} style={styles.moduleCard}>
+            <View style={styles.moduleHeader}>
+              <View style={styles.iconContainer}>
+                <Ionicons 
+                  name={item.mastery === 1 ? "checkmark-circle" : "book-outline"} 
+                  size={24} 
+                  color={item.mastery === 1 ? "#00D1FF" : "#666"} 
+                />
+              </View>
+              <View style={styles.moduleInfo}>
+                <Text style={styles.moduleTitle}>{item.title}</Text>
+                <Text style={styles.moduleDesc} numberOfLines={2}>
+                  {item.description}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.progressRow}>
+              <View style={styles.progressBarContainer}>
+                <View style={[styles.progressBar, { width: `${item.mastery * 100}%` }]} />
+              </View>
+              <Text style={styles.progressText}>{Math.round(item.mastery * 100)}%</Text>
+            </View>
+
+            <TouchableOpacity 
+              style={styles.quizButton}
+              onPress={() => navigation.navigate('Quiz', { moduleId: item.id })}
+            >
+              <Text style={styles.quizButtonText}>
+                {item.mastery === 1 ? "Retake Quiz" : "Take Quiz"}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color="#00D1FF" />
+            </TouchableOpacity>
+          </View>
+        ))}
       </View>
 
-      <Text style={styles.sectionTitle}>OWASP Top 10 · Python</Text>
-      <View style={styles.topicList}>
-        {topics.map(t => <TopicRow key={t.id} topic={t} onComplete={() => {}} />)}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>More modules coming soon</Text>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#fff' },
-  content: { padding: 16, gap: 14 },
-  progressCard: {
-    backgroundColor: '#F5F5F2', borderRadius: 12, padding: 16, gap: 10,
+  container: {
+    flex: 1,
+    backgroundColor: '#0D1117',
   },
-  progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  progressTitle: { fontSize: 13, fontWeight: '500' },
-  progressPct: { fontSize: 13, fontWeight: '500' },
-  progressBg: { height: 4, backgroundColor: '#E0E0E0', borderRadius: 99 },
-  progressFill: { height: 4, backgroundColor: '#111', borderRadius: 99 },
-  sectionTitle: { fontSize: 13, fontWeight: '500', color: '#888', letterSpacing: 0.4 },
-  topicList: {
-    borderWidth: 0.5, borderColor: '#E5E5E5',
-    borderRadius: 12, overflow: 'hidden',
+  header: {
+    padding: 24,
+    paddingTop: 40,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1A1D23',
   },
-  topicRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    padding: 14, borderBottomWidth: 0.5, borderBottomColor: '#E5E5E5',
-    backgroundColor: '#fff',
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  topicIcon: {
-    width: 40, height: 40, borderRadius: 8,
-    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFF',
   },
-  topicBody: { flex: 1, gap: 3 },
-  topicTitle: { fontSize: 13, fontWeight: '500' },
-  topicDesc: { fontSize: 11, color: '#888', lineHeight: 16 },
-  topicBadge: { borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3, flexShrink: 0 },
-  topicBadgeText: { fontSize: 11, fontWeight: '500' },
+  subtitle: {
+    fontSize: 16,
+    color: '#00D1FF',
+    marginTop: 4,
+  },
+  masteryCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 3,
+    borderColor: '#00D1FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 209, 255, 0.1)',
+  },
+  masteryText: {
+    color: '#00D1FF',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  listContainer: {
+    padding: 16,
+  },
+  moduleCard: {
+    backgroundColor: '#161B22',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#30363D',
+  },
+  moduleHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#0D1117',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  moduleInfo: {
+    flex: 1,
+  },
+  moduleTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  moduleDesc: {
+    fontSize: 12,
+    color: '#8B949E',
+    lineHeight: 18,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  progressBarContainer: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#0D1117',
+    borderRadius: 3,
+    marginRight: 10,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#00D1FF',
+    borderRadius: 3,
+  },
+  progressText: {
+    fontSize: 12,
+    color: '#8B949E',
+    width: 35,
+  },
+  quizButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#30363D',
+  },
+  quizButtonText: {
+    color: '#00D1FF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  footer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#484F58',
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
 });
+

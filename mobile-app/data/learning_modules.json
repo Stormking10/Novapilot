@@ -1,0 +1,67 @@
+[
+  {
+    "id": "owasp-1",
+    "title": "A01:2021-Broken Access Control",
+    "description": "Restrictions on what authenticated users are allowed to do are not properly enforced.",
+    "mastery": 0.85,
+    "questions": [
+      {
+        "text": "What is the primary risk of Broken Access Control?",
+        "options": ["Unauthorized data disclosure", "SQL Injection", "Slow performance", "Poor UI"],
+        "answer": 0
+      }
+    ]
+  },
+  {
+    "id": "owasp-2",
+    "title": "A02:2021-Cryptographic Failures",
+    "description": "Failure to protect sensitive data or using weak encryption algorithms.",
+    "mastery": 0.45,
+    "questions": [
+      {
+        "text": "Which hashing algorithm is considered insecure today?",
+        "options": ["SHA-256", "Argon2", "MD5", "bcrypt"],
+        "answer": 2
+      }
+    ]
+  },
+  {
+    "id": "owasp-3",
+    "title": "A03:2021-Injection",
+    "description": "User-supplied data is not validated, filtered, or sanitized by the application.",
+    "mastery": 1.0,
+    "questions": [
+      {
+        "text": "How can you prevent SQL Injection?",
+        "options": ["String concatenation", "Parameterized queries", "Turning off the DB", "Encoding HTML"],
+        "answer": 1
+      }
+    ]
+  },
+  {
+    "id": "owasp-4",
+    "title": "A04:2021-Insecure Design",
+    "description": "Risks related to design flaws, with a call for more use of threat modeling and secure design patterns.",
+    "mastery": 0.20,
+    "questions": [
+      {
+        "text": "What is 'Shift Left' in security?",
+        "options": ["Moving buttons left", "Testing earlier in development", "Using Linux", "None of the above"],
+        "answer": 1
+      }
+    ]
+  },
+  {
+    "id": "owasp-5",
+    "title": "A05:2021-Security Misconfiguration",
+    "description": "Insecure default configurations, open cloud storage, or misconfigured HTTP headers.",
+    "mastery": 0.60,
+    "questions": [
+      {
+        "text": "Which of these is a security misconfiguration?",
+        "options": ["Strong passwords", "Default admin credentials", "HTTPS enabled", "Firewall active"],
+        "answer": 1
+      }
+    ]
+  }
+]

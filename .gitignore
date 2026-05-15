@@ -26,3 +26,7 @@ bin/
 obj/
 __pycache__/
 *.pyc
+.eas/
+*.ipa
+*.apk
+*.aab
