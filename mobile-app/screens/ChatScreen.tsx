@@ -5,7 +5,7 @@ import {
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { chatWithAI } from '../api/scan';
+import { chatWithAI, chatWithAssistant, Vulnerability } from '../api/scan';
 
 interface Message {
   id: string;
@@ -14,11 +14,17 @@ interface Message {
 }
 
 export default function ChatScreen({ route, navigation }: any) {
-  const { code, vulnerability, language } = route.params;
+  const params = route?.params ?? {};
+  const code = params.code ?? '';
+  const vulnerability: Vulnerability | undefined = params.vulnerability;
+  const language = params.language ?? 'python';
+  const isFindingChat = Boolean(vulnerability);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: `Hello! I'm Novapilot AI. I noticed a security concern regarding "${vulnerability.title}". How can I help you understand this finding?`,
+      text: isFindingChat
+        ? `Hello! I'm Novapilot AI. I noticed a security concern regarding "${vulnerability?.title}". How can I help you understand this finding?`
+        : "I'm Novapilot AI, your security copilot. Ask me about secure coding, OWASP risks, dependency issues, or what to fix next.",
       isAi: true,
     },
   ]);
@@ -35,8 +41,14 @@ export default function ChatScreen({ route, navigation }: any) {
     setLoading(true);
 
     try {
-      const vulnContext = `Title: ${vulnerability.title}\nSeverity: ${vulnerability.severity}\nExplanation: ${vulnerability.explanation}`;
-      const response = await chatWithAI(code, vulnContext, input, language);
+      const response = isFindingChat && vulnerability
+        ? await chatWithAI(
+            code,
+            `Title: ${vulnerability.title}\nSeverity: ${vulnerability.severity}\nExplanation: ${vulnerability.explanation}`,
+            input,
+            language,
+          )
+        : await chatWithAssistant(input);
       
       const aiMsg: Message = { id: (Date.now() + 1).toString(), text: response.answer, isAi: true };
       setMessages(prev => [...prev, aiMsg]);
@@ -63,12 +75,20 @@ export default function ChatScreen({ route, navigation }: any) {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Ionicons name="chevron-back" size={24} color="#00D1FF" />
-        </TouchableOpacity>
+        {isFindingChat ? (
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Ionicons name="chevron-back" size={24} color="#00D1FF" />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.logo}>
+            <Ionicons name="sparkles-outline" size={20} color="#00D1FF" />
+          </View>
+        )}
         <View>
-          <Text style={styles.headerTitle}>Security Mentor</Text>
-          <Text style={styles.headerSub}>Discussing: {vulnerability.title}</Text>
+          <Text style={styles.headerTitle}>{isFindingChat ? 'Security Mentor' : 'AI Security Copilot'}</Text>
+          <Text style={styles.headerSub}>
+            {isFindingChat ? `Discussing: ${vulnerability?.title}` : 'General secure-coding assistant'}
+          </Text>
         </View>
       </View>
 
@@ -89,6 +109,19 @@ export default function ChatScreen({ route, navigation }: any) {
             </View>
           </View>
         ))}
+        {!isFindingChat && messages.length === 1 && (
+          <View style={styles.prompts}>
+            {[
+              'What should I fix first from my recent scans?',
+              'Explain OWASP A03 Injection.',
+              'How do I secure API keys in a mobile app?',
+            ].map(prompt => (
+              <TouchableOpacity key={prompt} style={styles.promptChip} onPress={() => setInput(prompt)}>
+                <Text style={styles.promptText}>{prompt}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
         {loading && (
           <View style={[styles.msgWrapper, styles.aiWrapper]}>
             <View style={[styles.bubble, styles.aiBubble, { paddingVertical: 12 }]}>
@@ -130,6 +163,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#161B22',
   },
   backBtn: { marginRight: 12 },
+  logo: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0D1117',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#30363D',
+    marginRight: 12,
+  },
   headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#E6EDF3' },
   headerSub: { fontSize: 12, color: '#8B949E' },
 
@@ -147,6 +191,18 @@ const styles = StyleSheet.create({
   msgText: { fontSize: 15, lineHeight: 22 },
   aiText: { color: '#E6EDF3' },
   userText: { color: '#000', fontWeight: '500' },
+  prompts: { gap: 10, alignSelf: 'stretch' },
+  promptChip: {
+    alignSelf: 'flex-start',
+    maxWidth: '92%',
+    backgroundColor: '#161B22',
+    borderWidth: 1,
+    borderColor: '#30363D',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  promptText: { color: '#00D1FF', fontSize: 13, fontWeight: '600' },
 
   inputArea: {
     flexDirection: 'row',

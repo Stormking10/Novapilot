@@ -65,3 +65,19 @@ export async function chatWithAI(
   }
   return response.json();
 }
+
+export async function chatWithAssistant(
+  user_question: string,
+  include_recent_scans = true,
+): Promise<{ answer: string }> {
+  const response = await fetch(`${API_BASE}/assistant-chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_question, include_recent_scans }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || 'Assistant chat failed');
+  }
+  return response.json();
+}

@@ -1,5 +1,4 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -49,6 +48,7 @@ const ICON_MAP: Record<string, string> = {
   Dashboard: 'grid-outline',
   Scanner: 'shield-outline',
   Results: 'bar-chart-outline',
+  Chat: 'chatbubble-ellipses-outline',
   Learn: 'book-outline',
 };
 
@@ -83,6 +83,7 @@ export default function App() {
           <Tab.Screen name="Dashboard" component={DashboardStack} />
           <Tab.Screen name="Scanner"   component={ScanStack} />
           <Tab.Screen name="Results"   component={ResultsScreen} />
+          <Tab.Screen name="Chat"      component={ChatScreen} />
           <Tab.Screen name="Learn"     component={LearnStack} />
         </Tab.Navigator>
       </NavigationContainer>

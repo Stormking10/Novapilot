@@ -235,3 +235,67 @@ async def chat_about_vulnerability(
         logger.error(f"AI Chat failed: {str(e)}")
         return f"I'm sorry, I encountered an error while trying to process your request: {str(e)}"
 
+
+async def general_security_chat(
+    user_question: str,
+    recent_scans: list[dict] | None = None,
+) -> str:
+    """
+    Handles general app-wide security assistant questions.
+    """
+    system_prompt = (
+        "You are Novapilot, an AI security copilot for mobile developers and app security learners. "
+        "Answer practical secure-coding, OWASP, dependency, and code-review questions. "
+        "Be concise, actionable, and educational. If recent scan context is supplied, use it to tailor advice."
+    )
+    scan_context = json.dumps((recent_scans or [])[:3], indent=2)
+    user_content = (
+        f"Recent scan context:\n{scan_context}\n\n"
+        f"User question: {user_question}"
+    )
+
+    if not ANTHROPIC_API_KEY and not OPENAI_API_KEY:
+        return (
+            "I can help as a local security guide, but live AI is not configured yet. "
+            "Add ANTHROPIC_API_KEY or OPENAI_API_KEY to the backend .env file for full chatbot answers. "
+            "For now, paste code into Scanner, review high-severity findings first, and use parameterized queries, safe auth checks, and dependency scanning as your baseline."
+        )
+
+    try:
+        if ANTHROPIC_API_KEY:
+            async with httpx.AsyncClient(timeout=45) as client:
+                resp = await client.post(
+                    "https://api.anthropic.com/v1/messages",
+                    headers={
+                        "x-api-key": ANTHROPIC_API_KEY,
+                        "anthropic-version": "2023-06-01",
+                        "content-type": "application/json",
+                    },
+                    json={
+                        "model": "claude-3-5-sonnet-20240620",
+                        "max_tokens": 1200,
+                        "system": system_prompt,
+                        "messages": [{"role": "user", "content": user_content}],
+                    },
+                )
+                resp.raise_for_status()
+                return resp.json()["content"][0]["text"]
+
+        async with httpx.AsyncClient(timeout=45) as client:
+            resp = await client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+                json={
+                    "model": "gpt-4o",
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_content},
+                    ],
+                    "max_tokens": 1200,
+                },
+            )
+            resp.raise_for_status()
+            return resp.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        logger.error(f"General AI Chat failed: {str(e)}")
+        return f"I'm sorry, I could not reach the AI assistant: {str(e)}"

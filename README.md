@@ -7,6 +7,7 @@ AI-assisted secure coding companion with a FastAPI backend and Expo mobile app.
 - Scans pasted source code with Semgrep and AI enrichment.
 - Stores scan history locally for dashboard trend views.
 - Supports follow-up security chat for individual findings.
+- Adds an app-wide AI Security Copilot chat tab.
 - Runs dependency checks against OSV.dev.
 - Scans GitHub repositories for Python security findings.
 - Generates attack walkthroughs, secure rewrite suggestions, and Markdown reports.
@@ -74,6 +75,7 @@ python -m pytest
 - `POST /api/scan`
 - `GET /api/history`
 - `POST /api/chat`
+- `POST /api/assistant-chat`
 - `POST /api/attack-simulate`
 - `POST /api/repo-scan`
 - `POST /api/dep-scan`
