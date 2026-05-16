@@ -2,6 +2,16 @@
 
 AI-assisted secure coding companion with a FastAPI backend and Expo mobile app.
 
+## App Preview
+
+| Dashboard | Scanner |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.jpeg) | ![Scanner](docs/screenshots/scanner.jpeg) |
+
+| AI Security Copilot | Learning Path |
+|---|---|
+| ![AI Security Copilot](docs/screenshots/chat.jpeg) | ![Learning Path](docs/screenshots/learn.jpeg) |
+
 ## What It Does
 
 - Provides a one-tap competition demo scan.
