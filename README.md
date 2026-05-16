@@ -4,6 +4,7 @@ AI-assisted secure coding companion with a FastAPI backend and Expo mobile app.
 
 ## What It Does
 
+- Provides a one-tap competition demo scan.
 - Scans pasted source code with Semgrep and AI enrichment.
 - Stores scan history locally for dashboard trend views.
 - Supports follow-up security chat for individual findings.
@@ -12,6 +13,7 @@ AI-assisted secure coding companion with a FastAPI backend and Expo mobile app.
 - Scans GitHub repositories for Python security findings.
 - Generates attack walkthroughs, secure rewrite suggestions, and Markdown reports.
 - Includes an OWASP learning path and lightweight local user profile.
+- Ships with Render and Docker deployment configuration for the backend.
 
 ## Project Layout
 
@@ -41,6 +43,34 @@ OPENAI_API_KEY=
 ```
 
 Without an AI key, Semgrep still runs and advanced AI endpoints return useful fallback responses.
+
+## Competition Demo
+
+Open the mobile app, go to **Scanner**, and use the **Competition Demo** panel. **Load** fills in a vulnerable sample, and **Run** opens a complete prebuilt scan result for fast judging.
+
+See `COMPETITION.md` for the full demo script.
+
+## Hosted Backend
+
+Render deployment is configured in `render.yaml`.
+
+```bash
+git push
+```
+
+Then create a Render Blueprint from this repo and set `EXPO_PUBLIC_API_URL` in `mobile-app/.env` to the hosted API URL:
+
+```text
+EXPO_PUBLIC_API_URL=https://YOUR_RENDER_SERVICE.onrender.com/api
+```
+
+Docker is also supported:
+
+```bash
+cd owaspilot_backend/backend
+docker build -t novapilot-api .
+docker run -p 8000:8000 --env-file .env novapilot-api
+```
 
 ## Mobile Setup
 

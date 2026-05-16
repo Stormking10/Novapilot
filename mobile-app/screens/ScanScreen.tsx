@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { scanCode } from '../api/scan';
+import { ScanResult, scanCode } from '../api/scan';
 import { scanDependencies, scanRepo, DepScanResult, RepoScanResult } from '../api/advanced';
 
 const PLACEHOLDER = `# paste your code here
@@ -18,6 +18,53 @@ def get_user(username):
     cursor.execute(query)
     return cursor.fetchone()
 `;
+
+const DEMO_CODE = `import sqlite3
+from flask import Flask, request
+
+app = Flask(__name__)
+app.config["SECRET_KEY"] = "dev-secret"
+
+def get_user():
+    username = request.args.get("username")
+    conn = sqlite3.connect("users.db")
+    query = f"SELECT * FROM users WHERE username = '{username}'"
+    return conn.execute(query).fetchone()
+`;
+
+const DEMO_RESULT: ScanResult = {
+  scan_id: 'demo-scan',
+  id: 'demo-scan',
+  language: 'python',
+  risk_score: 92,
+  summary: 'Critical SQL injection and hardcoded secret detected in the demo Flask handler.',
+  filename: 'demo_app.py',
+  created_at: new Date().toISOString(),
+  vulnerabilities: [
+    {
+      id: 'demo-1',
+      title: 'SQL Injection via f-string query',
+      severity: 'CRITICAL',
+      line: '9',
+      owasp: 'A03:2021',
+      cwe: 'CWE-89',
+      rule_id: 'python.sql-injection',
+      explanation: 'The query interpolates user-controlled input directly into SQL. An attacker can alter the query structure and read or modify unauthorized records.',
+      fix: 'conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()',
+    },
+    {
+      id: 'demo-2',
+      title: 'Hardcoded application secret',
+      severity: 'HIGH',
+      line: '5',
+      owasp: 'A02:2021',
+      cwe: 'CWE-798',
+      rule_id: 'python.hardcoded-secret',
+      explanation: 'The app secret is committed in source code. If leaked, attackers may forge sessions or bypass trust boundaries.',
+      fix: 'app.config["SECRET_KEY"] = os.environ["SECRET_KEY"]',
+    },
+  ],
+};
 
 export default function ScanScreen({ navigation }: any) {
   const [code, setCode] = useState('');
@@ -95,6 +142,19 @@ export default function ScanScreen({ navigation }: any) {
     }
   }
 
+  function loadDemoSnippet() {
+    setMode('code');
+    setLanguage('python');
+    setCode(DEMO_CODE);
+    setDepResult(null);
+    setRepoResult(null);
+    setProgress('');
+  }
+
+  function openDemoResults() {
+    navigation.navigate('Results', { result: DEMO_RESULT, code: DEMO_CODE, language: 'python' });
+  }
+
   return (
     <KeyboardAvoidingView 
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -103,6 +163,24 @@ export default function ScanScreen({ navigation }: any) {
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>New Analysis</Text>
         <Text style={styles.subtitle}>Choose a scan type and provide the source material.</Text>
+
+        <View style={styles.demoPanel}>
+          <View style={styles.demoIcon}>
+            <Ionicons name="flash-outline" size={18} color="#00D1FF" />
+          </View>
+          <View style={styles.demoCopy}>
+            <Text style={styles.demoTitle}>Competition Demo</Text>
+            <Text style={styles.demoText}>Show a full scan story in seconds with a vulnerable sample.</Text>
+          </View>
+          <View style={styles.demoActions}>
+            <TouchableOpacity style={styles.demoBtn} onPress={loadDemoSnippet}>
+              <Text style={styles.demoBtnText}>Load</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.demoBtn, styles.demoBtnPrimary]} onPress={openDemoResults}>
+              <Text style={[styles.demoBtnText, styles.demoBtnTextPrimary]}>Run</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         <View style={styles.modeRow}>
           {[
@@ -232,6 +310,43 @@ const styles = StyleSheet.create({
   content: { padding: 24, gap: 16 },
   title: { fontSize: 24, fontWeight: 'bold', color: '#E6EDF3' },
   subtitle: { fontSize: 14, color: '#8B949E', marginBottom: 8 },
+  demoPanel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#161B22',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#30363D',
+    padding: 14,
+  },
+  demoIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#0D1117',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#30363D',
+  },
+  demoCopy: { flex: 1 },
+  demoTitle: { color: '#E6EDF3', fontWeight: 'bold', fontSize: 14 },
+  demoText: { color: '#8B949E', fontSize: 12, lineHeight: 17, marginTop: 2 },
+  demoActions: { flexDirection: 'row', gap: 8 },
+  demoBtn: {
+    minWidth: 48,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#30363D',
+    backgroundColor: '#0D1117',
+  },
+  demoBtnPrimary: { backgroundColor: '#00D1FF', borderColor: '#00D1FF' },
+  demoBtnText: { color: '#00D1FF', fontWeight: 'bold', fontSize: 12 },
+  demoBtnTextPrimary: { color: '#0D1117' },
   
   langScroll: { gap: 10, paddingBottom: 10 },
   pill: {

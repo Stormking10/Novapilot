@@ -12,6 +12,11 @@ import { exportMarkdownReport, rewriteSecure, simulateAttack, AttackSimulation, 
 const { width } = Dimensions.get('window');
 
 const RISK_COLOR = (s: number) => s >= 70 ? '#FF4D4D' : s >= 40 ? '#D29922' : '#3FB950';
+const NEXT_STEPS = [
+  'Fix critical and high findings first.',
+  'Run the secure rewrite and compare the suggested changes.',
+  'Export the Markdown report for review or submission.',
+];
 
 function VulnRow({ v, code, language, navigation }: { v: Vulnerability, code: string, language: string, navigation: any }) {
   const [open, setOpen] = useState(false);
@@ -182,6 +187,12 @@ export default function ResultsScreen({ route, navigation }: any) {
         colors={['#1A1D23', '#0D1117']}
         style={styles.summaryCard}
       >
+        {result.scan_id === 'demo-scan' && (
+          <View style={styles.demoBadge}>
+            <Ionicons name="flash-outline" size={14} color="#00D1FF" />
+            <Text style={styles.demoBadgeText}>Demo scan</Text>
+          </View>
+        )}
         <View style={styles.summaryHeader}>
           <View style={styles.riskCircle}>
             <Text style={[styles.riskValue, { color: RISK_COLOR(risk_score) }]}>{risk_score}</Text>
@@ -208,6 +219,16 @@ export default function ResultsScreen({ route, navigation }: any) {
           </View>
         </View>
       </LinearGradient>
+
+      <View style={styles.nextPanel}>
+        <Text style={styles.nextTitle}>Recommended Next Steps</Text>
+        {NEXT_STEPS.map((step, index) => (
+          <View key={step} style={styles.nextRow}>
+            <Text style={styles.nextNumber}>{index + 1}</Text>
+            <Text style={styles.nextText}>{step}</Text>
+          </View>
+        ))}
+      </View>
 
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>DETAILED FINDINGS</Text>
@@ -274,7 +295,16 @@ export default function ResultsScreen({ route, navigation }: any) {
           {rewrite.changes.map((change, index) => (
             <Text key={`${change.type}-${index}`} style={styles.outputText}>{change.type}: {change.description}</Text>
           ))}
-          <Text style={styles.codeBlock}>{rewrite.rewritten_code}</Text>
+          <View style={styles.beforeAfterGrid}>
+            <View style={styles.codeColumn}>
+              <Text style={styles.codeLabel}>Original</Text>
+              <Text style={[styles.codeBlock, styles.originalBlock]}>{activeCode || 'Original code unavailable for this historical scan.'}</Text>
+            </View>
+            <View style={styles.codeColumn}>
+              <Text style={styles.codeLabel}>Secure Rewrite</Text>
+              <Text style={styles.codeBlock}>{rewrite.rewritten_code}</Text>
+            </View>
+          </View>
         </View>
       )}
 
@@ -324,6 +354,20 @@ const styles = StyleSheet.create({
     borderColor: '#30363D',
     marginBottom: 24,
   },
+  demoBadge: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: '#30363D',
+    backgroundColor: '#0D1117',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  demoBadgeText: { color: '#00D1FF', fontSize: 11, fontWeight: 'bold' },
   summaryHeader: { flexDirection: 'row', alignItems: 'center' },
   riskCircle: {
     width: 64, height: 64,
@@ -344,6 +388,29 @@ const styles = StyleSheet.create({
   miniStat: { flex: 1 },
   miniStatLabel: { fontSize: 10, color: '#8B949E', fontWeight: 'bold', marginBottom: 4 },
   miniStatValue: { fontSize: 18, fontWeight: 'bold', color: '#E6EDF3' },
+  nextPanel: {
+    backgroundColor: '#161B22',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#30363D',
+    padding: 16,
+    gap: 10,
+    marginBottom: 22,
+  },
+  nextTitle: { color: '#E6EDF3', fontSize: 15, fontWeight: 'bold' },
+  nextRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  nextNumber: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+    color: '#0D1117',
+    backgroundColor: '#00D1FF',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  nextText: { flex: 1, color: '#C9D1D9', fontSize: 13, lineHeight: 19 },
 
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16, marginTop: 8 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: '#8B949E', letterSpacing: 1 },
@@ -477,6 +544,9 @@ const styles = StyleSheet.create({
   outputTitle: { color: '#E6EDF3', fontSize: 16, fontWeight: 'bold' },
   outputMeta: { color: '#8B949E', fontSize: 12, fontWeight: '700' },
   outputText: { color: '#C9D1D9', fontSize: 13, lineHeight: 20 },
+  beforeAfterGrid: { gap: 12 },
+  codeColumn: { gap: 6 },
+  codeLabel: { color: '#8B949E', fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase' },
   codeBlock: {
     backgroundColor: '#0D1117',
     color: '#7EE787',
@@ -486,4 +556,5 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
+  originalBlock: { color: '#FFB4A9' },
 });
