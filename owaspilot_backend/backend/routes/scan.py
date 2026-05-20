@@ -5,12 +5,23 @@ POST /api/scan  — the main vulnerability scanning endpoint
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
-from models.scan import ScanRequest, ScanResult, Vulnerability, Language
+from models.scan import ScanRequest, ScanResult, Vulnerability, Language, Severity
 from scanners.semgrep import run_semgrep
 from ai.explainer import explain_vulnerabilities
 from services.history_store import save_scan
 
 router = APIRouter()
+
+_VALID_SEVERITIES = {s.value for s in Severity}
+
+
+def _normalize_severity(value: str | None) -> Severity:
+    if not value:
+        return Severity.INFO
+    upper = str(value).strip().upper()
+    if upper in _VALID_SEVERITIES:
+        return Severity(upper)
+    return Severity.INFO
 
 
 @router.post("/scan", response_model=ScanResult)
@@ -49,7 +60,7 @@ async def scan_code(req: ScanRequest) -> ScanResult:
         vulns.append(Vulnerability(
             id          = v.get("id", f"vuln-{i+1}"),
             title       = v.get("title", "Unknown"),
-            severity    = v.get("severity", "INFO"),
+            severity    = _normalize_severity(v.get("severity")),
             line        = v.get("line", "?"),
             owasp       = v.get("owasp") or sg.get("owasp"),
             rule_id     = sg.get("rule_id"),

@@ -2,9 +2,8 @@
 ai/attack_simulator.py
 Generates a step-by-step attacker walkthrough for a given vulnerability.
 """
-import os, json, httpx
-
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+import json
+from ai.groq_llm import groq_chat, _api_key as groq_api_key
 
 SYSTEM = """You are a senior penetration tester writing educational attack walkthroughs.
 Given a vulnerability, produce a step-by-step explanation of how a real attacker would exploit it.
@@ -31,7 +30,7 @@ async def simulate_attack(vulnerability: dict) -> dict:
     """
     vulnerability: dict with keys title, severity, explanation, owasp, fix
     """
-    if not ANTHROPIC_API_KEY:
+    if not groq_api_key():
         return {
             "attack_name": vulnerability.get("title", "Security finding walkthrough"),
             "difficulty": "Medium",
@@ -58,21 +57,24 @@ async def simulate_attack(vulnerability: dict) -> dict:
 
     user = f"Vulnerability:\n{json.dumps(vulnerability, indent=2)}"
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 1024,
-                "system": SYSTEM,
-                "messages": [{"role": "user", "content": user}],
-            },
-        )
-        resp.raise_for_status()
-        text = resp.json()["content"][0]["text"]
-        return json.loads(text.replace("```json","").replace("```","").strip())
+    text = groq_chat(system=SYSTEM, user=user, max_tokens=1024)
+    
+    # Extract JSON from response (handle markdown formatting)
+    text = text.strip()
+    if text.startswith("```"):
+        # Remove leading ```json or ```
+        text = text.lstrip("`").lstrip("json").strip()
+    if text.endswith("```"):
+        text = text.rstrip("`").strip()
+    
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        # Fallback if LLM returns invalid JSON
+        return {
+            "attack_name": vulnerability.get("title", "Attack walkthrough"),
+            "difficulty": "Medium",
+            "steps": [{"number": 1, "title": "Error", "description": f"Failed to parse LLM response: {str(e)}"}],
+            "impact": "Unable to generate attack walkthrough",
+            "mitigations": [vulnerability.get("fix", "Apply the recommended fix")]
+        }

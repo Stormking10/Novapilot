@@ -5,6 +5,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import SplashScreen from './screens/SplashScreen';
+import OnboardingScreen from './screens/OnboardingScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import ScanScreen from './screens/ScanScreen';
 import ResultsScreen from './screens/ResultsScreen';
@@ -52,40 +54,50 @@ const ICON_MAP: Record<string, string> = {
   Learn: 'book-outline',
 };
 
+function MainAppNavigator() {
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: true,
+        headerTitle: route.name === 'Dashboard' ? 'Novapilot' : route.name,
+        tabBarIcon: ({ color, size }) => (
+          <Ionicons name={ICON_MAP[route.name] as any} size={size} color={color} />
+        ),
+        tabBarActiveTintColor: '#00D1FF',
+        tabBarInactiveTintColor: '#666',
+        tabBarStyle: { 
+          backgroundColor: '#0A0C10', 
+          borderTopWidth: 1, 
+          borderTopColor: '#1A1D23',
+          paddingTop: 5,
+        },
+        headerStyle: { 
+          backgroundColor: '#0A0C10', 
+          borderBottomWidth: 1, 
+          borderBottomColor: '#1A1D23' 
+        },
+        headerTitleStyle: { color: '#00D1FF', fontWeight: 'bold' },
+        headerShadowVisible: false,
+      })}
+    >
+      <Tab.Screen name="Dashboard" component={DashboardStack} />
+      <Tab.Screen name="Scanner"   component={ScanStack} />
+      <Tab.Screen name="Results"   component={ResultsScreen} />
+      <Tab.Screen name="Chat"      component={ChatScreen} />
+      <Tab.Screen name="Learn"     component={LearnStack} />
+    </Tab.Navigator>
+  );
+}
+
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <NavigationContainer>
-        <Tab.Navigator
-          screenOptions={({ route }) => ({
-            headerShown: true,
-            headerTitle: route.name === 'Dashboard' ? 'Novapilot' : route.name,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name={ICON_MAP[route.name] as any} size={size} color={color} />
-            ),
-            tabBarActiveTintColor: '#00D1FF',
-            tabBarInactiveTintColor: '#666',
-            tabBarStyle: { 
-              backgroundColor: '#0A0C10', 
-              borderTopWidth: 1, 
-              borderTopColor: '#1A1D23',
-              paddingTop: 5,
-            },
-            headerStyle: { 
-              backgroundColor: '#0A0C10', 
-              borderBottomWidth: 1, 
-              borderBottomColor: '#1A1D23' 
-            },
-            headerTitleStyle: { color: '#00D1FF', fontWeight: 'bold' },
-            headerShadowVisible: false,
-          })}
-        >
-          <Tab.Screen name="Dashboard" component={DashboardStack} />
-          <Tab.Screen name="Scanner"   component={ScanStack} />
-          <Tab.Screen name="Results"   component={ResultsScreen} />
-          <Tab.Screen name="Chat"      component={ChatScreen} />
-          <Tab.Screen name="Learn"     component={LearnStack} />
-        </Tab.Navigator>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Splash" component={SplashScreen} />
+          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <Stack.Screen name="MainApp" component={MainAppNavigator} />
+        </Stack.Navigator>
       </NavigationContainer>
     </GestureHandlerRootView>
   );

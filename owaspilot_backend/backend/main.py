@@ -1,3 +1,9 @@
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables from .env FIRST before importing anything else
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import scan, history, health, chat, advanced

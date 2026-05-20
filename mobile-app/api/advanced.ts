@@ -1,3 +1,5 @@
+import { apiFetch, formatApiError } from './errors';
+
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 
 // ── Attack simulation ─────────────────────────────────────────────────────
@@ -18,12 +20,15 @@ export interface AttackSimulation {
 }
 
 export async function simulateAttack(vulnerability: object): Promise<AttackSimulation> {
-  const res = await fetch(`${API_BASE}/attack-simulate`, {
+  const res = await apiFetch(`${API_BASE}/attack-simulate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ vulnerability }),
   });
-  if (!res.ok) throw new Error(`Attack sim failed: ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(formatApiError(err.detail, `Attack sim failed: ${res.status}`));
+  }
   return res.json();
 }
 
@@ -42,12 +47,15 @@ export async function scanRepo(
   githubUrl: string,
   onProgress: (pct: number, message: string) => void,
 ): Promise<RepoScanResult> {
-  const res = await fetch(`${API_BASE}/repo-scan`, {
+  const res = await apiFetch(`${API_BASE}/repo-scan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ github_url: githubUrl }),
   });
-  if (!res.ok) throw new Error(`Repo scan failed: ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(formatApiError(err.detail, `Repo scan failed: ${res.status}`));
+  }
 
   if (!res.body || !(res.body as any).getReader) {
     const text = await res.text();
@@ -109,12 +117,15 @@ export async function scanDependencies(
   content: string,
   filename = 'requirements.txt',
 ): Promise<DepScanResult> {
-  const res = await fetch(`${API_BASE}/dep-scan`, {
+  const res = await apiFetch(`${API_BASE}/dep-scan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content, filename }),
   });
-  if (!res.ok) throw new Error(`Dep scan failed: ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(formatApiError(err.detail, `Dep scan failed: ${res.status}`));
+  }
   return res.json();
 }
 
@@ -132,21 +143,27 @@ export async function rewriteSecure(
   code: string,
   vulnerabilities: object[],
 ): Promise<RewriteResult> {
-  const res = await fetch(`${API_BASE}/rewrite`, {
+  const res = await apiFetch(`${API_BASE}/rewrite`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code, vulnerabilities }),
   });
-  if (!res.ok) throw new Error(`Rewrite failed: ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(formatApiError(err.detail, `Rewrite failed: ${res.status}`));
+  }
   return res.json();
 }
 
 export async function exportMarkdownReport(result: object): Promise<string> {
-  const res = await fetch(`${API_BASE}/report`, {
+  const res = await apiFetch(`${API_BASE}/report`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ result }),
   });
-  if (!res.ok) throw new Error(`Report export failed: ${res.status}`);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(formatApiError(err.detail, `Report export failed: ${res.status}`));
+  }
   return res.text();
 }

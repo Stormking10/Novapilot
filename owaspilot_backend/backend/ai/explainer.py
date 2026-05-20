@@ -1,21 +1,18 @@
 """
 ai/explainer.py
-Uses an LLM to explain vulnerabilities and generate secure fixes.
-Set OPENAI_API_KEY or ANTHROPIC_API_KEY in your .env
+Uses Groq LLM to explain vulnerabilities and generate secure fixes.
+Set GROQ_API_KEY in your .env
 """
 import os
 import json
-import httpx
 import logging
 from typing import Optional, List
 from pydantic import ValidationError
 from models.scan import Vulnerability, Severity, Language
+from ai.groq_llm import groq_chat, _api_key as groq_api_key
 
 # Setup logging
 logger = logging.getLogger("novapilot.ai")
-
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-OPENAI_API_KEY    = os.getenv("OPENAI_API_KEY", "")
 
 SYSTEM_PROMPT = """You are Novapilot, a world-class security researcher and secure-code reviewer.
 Your goal is to perform a deep analysis of the provided source code and Semgrep findings.
@@ -61,18 +58,16 @@ async def explain_vulnerabilities(
     language: str = "python",
 ) -> dict:
     """
-    Calls the LLM and returns a parsed and validated dict.
+    Calls Groq LLM to explain vulnerabilities and returns a parsed response.
     """
     context = SECURITY_CONTEXTS.get(language, "General security audit.")
     user_content = _build_user_message(code, semgrep_findings, language, context)
 
     try:
-        if ANTHROPIC_API_KEY:
-            raw_response = await _call_anthropic(user_content)
-        elif OPENAI_API_KEY:
-            raw_response = await _call_openai(user_content)
-        else:
+        if not groq_api_key():
             return _fallback_response(semgrep_findings)
+
+        raw_response = await _call_groq(user_content)
 
         # Basic JSON parsing
         data = _parse_llm_response(raw_response)
@@ -95,44 +90,12 @@ def _build_user_message(code: str, findings: List[dict], language: str, context:
     )
 
 
-async def _call_anthropic(user_content: str) -> str:
-    async with httpx.AsyncClient(timeout=45) as client:
-        resp = await client.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-3-5-sonnet-20240620", # Updated to a known stable model
-                "max_tokens": 4096,
-                "system": SYSTEM_PROMPT,
-                "messages": [{"role": "user", "content": user_content}],
-                "temperature": 0,
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()["content"][0]["text"]
+async def _call_groq(user_content: str) -> str:
+    """Call Groq API synchronously."""
+    return groq_chat(system=SYSTEM_PROMPT, user=user_content, max_tokens=4096)
 
 
-async def _call_openai(user_content: str) -> str:
-    async with httpx.AsyncClient(timeout=45) as client:
-        resp = await client.post(
-            "https://api.openai.com/v1/chat/completions",
-            headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-            json={
-                "model": "gpt-4o",
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user",   "content": user_content},
-                ],
-                "max_tokens": 4096,
-                "temperature": 0,
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+
 
 
 def _parse_llm_response(text: str) -> dict:
@@ -157,14 +120,14 @@ def _fallback_response(findings: List[dict], error: str = None) -> dict:
             "line": f.get("line", "?"),
             "owasp": f.get("owasp"),
             "explanation": f.get("message", "AI analysis unavailable."),
-            "fix": "# Configure API key for AI-generated fixes.",
+            "fix": "# Configure GROQ_API_KEY for AI-generated fixes.",
         })
     
     summary = "Semgrep analysis complete."
     if error:
         summary = f"AI analysis failed: {error[:50]}..."
-    elif not ANTHROPIC_API_KEY and not OPENAI_API_KEY:
-        summary = "No AI key configured. Using static analysis only."
+    elif not groq_api_key():
+        summary = "No Groq API key configured. Using static analysis only."
 
     return {
         "vulnerabilities": vulns,
@@ -181,6 +144,9 @@ async def chat_about_vulnerability(
     """
     Handles conversational follow-ups about a specific vulnerability.
     """
+    if not groq_api_key():
+        return "AI Chat is unavailable. Please configure GROQ_API_KEY in the backend environment."
+
     system_prompt = (
         "You are Novapilot, an expert security mentor. "
         "A user is asking a question about a security vulnerability found in their code. "
@@ -194,42 +160,7 @@ async def chat_about_vulnerability(
     )
 
     try:
-        if ANTHROPIC_API_KEY:
-            async with httpx.AsyncClient(timeout=45) as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": ANTHROPIC_API_KEY,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
-                    json={
-                        "model": "claude-3-5-sonnet-20240620",
-                        "max_tokens": 1024,
-                        "system": system_prompt,
-                        "messages": [{"role": "user", "content": user_content}],
-                    },
-                )
-                resp.raise_for_status()
-                return resp.json()["content"][0]["text"]
-        elif OPENAI_API_KEY:
-            async with httpx.AsyncClient(timeout=45) as client:
-                resp = await client.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-                    json={
-                        "model": "gpt-4o",
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user",   "content": user_content},
-                        ],
-                        "max_tokens": 1024,
-                    },
-                )
-                resp.raise_for_status()
-                return resp.json()["choices"][0]["message"]["content"]
-        else:
-            return "AI Chat is unavailable. Please configure an API key in the backend environment."
+        return groq_chat(system=system_prompt, user=user_content, max_tokens=1024)
 
     except Exception as e:
         logger.error(f"AI Chat failed: {str(e)}")
@@ -243,6 +174,13 @@ async def general_security_chat(
     """
     Handles general app-wide security assistant questions.
     """
+    if not groq_api_key():
+        return (
+            "I can help as a local security guide, but live AI is not configured yet. "
+            "Add GROQ_API_KEY to the backend .env file for full chatbot answers. "
+            "For now, paste code into Scanner, review high-severity findings first, and use parameterized queries, safe auth checks, and dependency scanning as your baseline."
+        )
+
     system_prompt = (
         "You are Novapilot, an AI security copilot for mobile developers and app security learners. "
         "Answer practical secure-coding, OWASP, dependency, and code-review questions. "
@@ -254,48 +192,9 @@ async def general_security_chat(
         f"User question: {user_question}"
     )
 
-    if not ANTHROPIC_API_KEY and not OPENAI_API_KEY:
-        return (
-            "I can help as a local security guide, but live AI is not configured yet. "
-            "Add ANTHROPIC_API_KEY or OPENAI_API_KEY to the backend .env file for full chatbot answers. "
-            "For now, paste code into Scanner, review high-severity findings first, and use parameterized queries, safe auth checks, and dependency scanning as your baseline."
-        )
-
     try:
-        if ANTHROPIC_API_KEY:
-            async with httpx.AsyncClient(timeout=45) as client:
-                resp = await client.post(
-                    "https://api.anthropic.com/v1/messages",
-                    headers={
-                        "x-api-key": ANTHROPIC_API_KEY,
-                        "anthropic-version": "2023-06-01",
-                        "content-type": "application/json",
-                    },
-                    json={
-                        "model": "claude-3-5-sonnet-20240620",
-                        "max_tokens": 1200,
-                        "system": system_prompt,
-                        "messages": [{"role": "user", "content": user_content}],
-                    },
-                )
-                resp.raise_for_status()
-                return resp.json()["content"][0]["text"]
+        return groq_chat(system=system_prompt, user=user_content, max_tokens=1200)
 
-        async with httpx.AsyncClient(timeout=45) as client:
-            resp = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
-                json={
-                    "model": "gpt-4o",
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_content},
-                    ],
-                    "max_tokens": 1200,
-                },
-            )
-            resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
     except Exception as e:
         logger.error(f"General AI Chat failed: {str(e)}")
         return f"I'm sorry, I could not reach the AI assistant: {str(e)}"

@@ -1,3 +1,5 @@
+import { apiFetch, formatApiError } from './errors';
+
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000/api';
 
 export interface Vulnerability {
@@ -24,7 +26,7 @@ export interface ScanResult {
 }
 
 export async function scanCode(code: string, language = 'python'): Promise<ScanResult> {
-  const response = await fetch(`${API_BASE}/scan`, {
+  const response = await apiFetch(`${API_BASE}/scan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ code, language }),
@@ -32,15 +34,23 @@ export async function scanCode(code: string, language = 'python'): Promise<ScanR
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({}));
-    throw new Error(err.detail ?? `Scan failed: ${response.status}`);
+    throw new Error(formatApiError(err.detail, `Scan failed: ${response.status}`));
   }
 
   return response.json();
 }
 
 export async function getHistory(): Promise<{ scans: ScanResult[] }> {
-  const response = await fetch(`${API_BASE}/history`);
-  return response.json();
+  try {
+    const response = await apiFetch(`${API_BASE}/history`);
+    if (!response.ok) {
+      throw new Error(`History failed: ${response.status}`);
+    }
+    return response.json();
+  } catch (error) {
+    console.warn('History unavailable (is the backend running?):', error);
+    return { scans: [] };
+  }
 }
 
 export async function chatWithAI(
@@ -49,7 +59,7 @@ export async function chatWithAI(
   user_question: string,
   language: string = "python"
 ): Promise<{ answer: string }> {
-  const response = await fetch(`${API_BASE}/chat`, {
+  const response = await apiFetch(`${API_BASE}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -60,8 +70,8 @@ export async function chatWithAI(
     }),
   });
   if (!response.ok) {
-    const err = await response.json();
-    throw new Error(err.detail || 'Chat failed');
+    const err = await response.json().catch(() => ({}));
+    throw new Error(formatApiError(err.detail, `Chat failed: ${response.status}`));
   }
   return response.json();
 }
@@ -70,14 +80,19 @@ export async function chatWithAssistant(
   user_question: string,
   include_recent_scans = true,
 ): Promise<{ answer: string }> {
-  const response = await fetch(`${API_BASE}/assistant-chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ user_question, include_recent_scans }),
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.detail || 'Assistant chat failed');
+  try {
+    const response = await apiFetch(`${API_BASE}/assistant-chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_question, include_recent_scans }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(formatApiError(err.detail, `Assistant chat failed: ${response.status}`));
+    }
+    return response.json();
+  } catch (error) {
+    console.error('Error in assistant chat:', error);
+    throw error;
   }
-  return response.json();
 }

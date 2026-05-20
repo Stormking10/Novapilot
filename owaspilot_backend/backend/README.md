@@ -9,7 +9,10 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-cp .env.example .env        # add your ANTHROPIC_API_KEY
+cp .env.example .env        # add your ANTHROPIC_API_KEY or OPENAI_API_KEY
+# then edit backend/.env and add your key like:
+# ANTHROPIC_API_KEY=sk-...
+# or OPENAI_API_KEY=sk-...
 uvicorn main:app --reload
 ```
 
